@@ -39,41 +39,22 @@
 **纯客户端运行**：无服务端构建步骤，应用由 Transmission 自带的嵌入式 HTTP server 直接提供，
 通过相对路径 `../rpc` 与 RPC API 通信（自动完成 409 session-id 握手与 Basic auth）。
 
-## 快速开始
+---
 
-```sh
-# 1. 安装依赖（仅首次）
-npm install
+## 用户安装使用（无需构建工具）
 
-# 2. 构建生产版本
-npm run build
-```
+> 本节面向**普通用户**——只需要在你的 Transmission 主机上装好界面，不需要 Node.js 或任何构建工具。
 
-产物在 `dist/`。将 `dist/` 内容原样拷贝到 Transmission 的 web 目录即可生效
-（`public/tr-web-control/` 下的静态资产保留了老版相对路径，无需额外配置）。
-
-## 部署到 Transmission 主机
-
-```sh
-npx vite build
-scp -pr dist/* root@<host>:/usr/share/transmission/public_html/.
-```
-
-刷新或重启 Transmission 后访问 `http://<host>:9091/transmission/web/`。
-RPC 认证：使用与 Transmission 配置相同的凭据（在客户端 Settings → RPC 中设置）。
-
-## 在线安装（客户，无需构建工具）
-
-不需要安装 Node.js / 构建工具，一行命令即可安装：
+### 一键安装
 
 ```sh
 wget https://github.com/sysit/transmission-web-control-ng/releases/download/v1.0.0/install.sh -O - | sudo bash
 ```
 
-> 该命令会下载 `install.sh` 并直接以 `sudo bash` 执行。因 stdin 非终端，
-> 脚本默认执行**非交互安装**。系统需具备 `wget`/`curl` 与 `sudo`。
+> 该命令从 GitHub Release 下载 `install.sh` 并直接以 `sudo bash` 执行。
+> 因 stdin 非终端，脚本默认执行**非交互安装**。系统需具备 `wget`/`curl` 与 `sudo`。
 
-脚本会自动完成：
+脚本自动完成：
 
 1. **检测 web 目录**——依据 `transmission-daemon` 版本自动选择
    `public_html/`（≥ 3.0）或 `web/`（< 3.0），也支持
@@ -82,7 +63,19 @@ wget https://github.com/sysit/transmission-web-control-ng/releases/download/v1.0
 3. **备份原界面**——原 `index.html` 保存为 `index.original.html`；
 4. **清理重装**——重装时移除上次生成的残留文件，保证幂等。
 
-**回滚到原版界面**（需先保存 install.sh）：
+### 使用
+
+安装完成后，浏览器访问：
+
+```
+http://<transmission-host>:9091/transmission/web/
+```
+
+RPC 认证：使用与 Transmission 配置相同的凭据（在客户端 Settings → RPC 中设置）。
+
+### 回滚到原版界面
+
+需先保存 install.sh 再执行：
 
 ```sh
 wget https://github.com/sysit/transmission-web-control-ng/releases/download/v1.0.0/install.sh -O install.sh
@@ -91,18 +84,46 @@ sudo bash install.sh revert
 
 > 从 Release 下载的安装脚本源码位于 `release/install-tr-control-ng.sh`。
 
-## 开发
+---
+
+## 开发（面向开发者）
+
+> 本节面向**开发者**——需要从源码构建、调试或二次开发。需要 Node.js 18+ 与 npm。
+
+### 快速开始
 
 ```sh
-npm install
+npm install        # 安装依赖（仅首次）
 npm run dev        # Vite 开发服务器
-npx tsc --noEmit   # 类型检查
-npx vitest run     # 单元测试
-npm run lint       # oxlint
+```
+
+### 构建生产版本
+
+```sh
 npx vite build     # 生产构建 → dist/
 ```
 
-## 目录结构
+产物在 `dist/`。将 `dist/` 内容原样拷贝到 Transmission 的 web 目录即可生效
+（`public/tr-web-control/` 下的静态资产保留了老版相对路径，无需额外配置）。
+
+### 部署到 Transmission 主机
+
+```sh
+npx vite build
+scp -pr dist/* root@<host>:/usr/share/transmission/public_html/.
+```
+
+刷新或重启 Transmission 后访问 `http://<host>:9091/transmission/web/`。
+
+### 测试与检查
+
+```sh
+npx tsc --noEmit   # 类型检查
+npx vitest run     # 单元测试
+npm run lint       # oxlint
+```
+
+### 目录结构
 
 ```
 src/
@@ -116,6 +137,8 @@ src/
 │   └── dashboard/  # 主页面：标题栏 + 工具栏 + 侧边栏树 + 种子表格 + 详情面板 + 状态栏
 └── styles/         # global.css：设计 token + EasyUI 忠实复刻组件样式
 ```
+
+---
 
 ## 致谢与许可证
 
