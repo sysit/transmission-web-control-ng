@@ -29,7 +29,7 @@ error(){ echo -e "\033[31m[ERROR] $1\033[0m"; exit 1; }
 # Detect the Transmission web directory. Priority:
 #   1. command-line argument
 #   2. TRANSMISSION_WEB_HOME environment variable
-#   3. common install paths
+#   3. version-aware common install paths (>=3.0 -> public_html, <3.0 -> web)
 #   4. ask the user
 # ---------------------------------------------------------------------------
 detect_web_dir() {
@@ -41,22 +41,57 @@ detect_web_dir() {
     echo "$TRANSMISSION_WEB_HOME"; return 0
   fi
 
-  for dir in \
-    /usr/share/transmission/web \
-    /usr/local/share/transmission/web \
-    /var/lib/transmission-daemon/web \
-    /var/lib/transmission/web \
-    /opt/transmission/web \
-    /snap/transmission/common/web \
-    /var/packages/transmission/target/share/transmission/web \
-    "$HOME/.config/transmission/web"; do
-    if [ -d "$dir" ]; then
-      echo "$dir"; return 0
+  local bases="
+    /usr/share/transmission
+    /usr/local/share/transmission
+    /var/lib/transmission-daemon
+    /var/lib/transmission
+    /opt/transmission
+    /snap/transmission/common
+    /var/packages/transmission/target/share/transmission"
+
+  # Transmission >= 3.0 将 web UI 目录从 web/ 改名为 public_html/。
+  # 默认优先 public_html(3.0+ 主流,旧版无此目录会自动落到 web);
+  # 仅当明确探测到版本 < 3.0 时才切回 web。
+  # 注意:某些版本的 transmission-daemon 把版本号写到 stderr,故用 2>&1 捕获。
+  local web_dir_name="public_html"
+  local ver=""
+  if command -v transmission-daemon >/dev/null 2>&1; then
+    ver=$(transmission-daemon -V 2>&1 | head -1)
+    [ -z "$ver" ] && ver=$(transmission-daemon --version 2>&1 | head -1)
+  fi
+  if [ -z "$ver" ]; then
+    for bin in /usr/bin/transmission-daemon /usr/local/bin/transmission-daemon; do
+      [ -x "$bin" ] || continue
+      ver=$("$bin" -V 2>&1 | head -1)
+      [ -z "$ver" ] && ver=$("$bin" --version 2>&1 | head -1)
+      [ -n "$ver" ] && break
+    done
+  fi
+  local major
+  major=$(printf '%s' "$ver" | grep -oE '[0-9]+' | head -1)
+  if [ -n "$major" ] && [ "$major" -lt 3 ] 2>/dev/null; then
+    web_dir_name="web"
+  fi
+
+  # 首选版本对应目录
+  for base in $bases; do
+    if [ -d "$base/$web_dir_name" ]; then
+      echo "$base/$web_dir_name"; return 0
     fi
   done
 
+  # 首选目录缺失时,两个名字都兜底尝试(public_html 优先,旧版无则落 web)
+  for base in $bases; do
+    for name in public_html web; do
+      if [ -d "$base/$name" ]; then
+        echo "$base/$name"; return 0
+      fi
+    done
+  done
+
   echo ""
-  printf "Could not auto-detect the Transmission web directory.\nPlease enter it (e.g /usr/share/transmission/web): "
+  printf "Could not auto-detect the Transmission web directory.\nPlease enter it (e.g /usr/share/transmission/public_html): "
   read -r custom
   if [ -d "$custom" ]; then
     echo "$custom"; return 0
@@ -71,9 +106,13 @@ download_package() {
   local tmp="$1"
   log "Downloading $PACK_NAME ($VERSION) ..."
   if command -v curl >/dev/null 2>&1; then
-    curl -fSL "$DOWNLOAD_URL" -o "$tmp/$PACK_NAME" || error "Download failed. Check your network or the release URL."
+    # --retry-all-errors:网络抖动时自动重试,提升弱网环境成功率
+    curl -fSL --retry 5 --retry-delay 3 --retry-all-errors \
+      "$DOWNLOAD_URL" -o "$tmp/$PACK_NAME" \
+      || error "Download failed. Check your network or the release URL."
   elif command -v wget >/dev/null 2>&1; then
-    wget "$DOWNLOAD_URL" -O "$tmp/$PACK_NAME" || error "Download failed. Check your network or the release URL."
+    wget --tries=5 --timeout=60 "$DOWNLOAD_URL" -O "$tmp/$PACK_NAME" \
+      || error "Download failed. Check your network or the release URL."
   else
     error "Could not find curl or wget, please install one."
   fi
@@ -103,6 +142,12 @@ install_webui() {
     log "Backing up original index.html -> index.original.html"
     cp "$web_dir/index.html" "$web_dir/index.original.html"
   fi
+
+  # 清理上次安装生成的残留文件,保证重装幂等(与 revert 清理范围一致,
+  # 不动 index.original.html 备份)
+  rm -rf "$web_dir/assets" "$web_dir/tr-web-control"
+  rm -f "$web_dir/favicon.svg" "$web_dir/icons.svg" \
+        "$web_dir/logo.png" "$web_dir/logo-white.png" "$web_dir/manifest.json"
 
   log "Installing Transmission Web Control NG ..."
   cp -r "$src/." "$web_dir/"

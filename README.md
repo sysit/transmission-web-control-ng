@@ -62,6 +62,35 @@ scp -pr dist/* root@<host>:/usr/share/transmission/public_html/.
 刷新或重启 Transmission 后访问 `http://<host>:9091/transmission/web/`。
 RPC 认证：使用与 Transmission 配置相同的凭据（在客户端 Settings → RPC 中设置）。
 
+## 在线安装（客户，无需构建工具）
+
+不需要安装 Node.js / 构建工具，一行命令即可安装：
+
+```sh
+wget https://github.com/sysit/transmission-web-control-ng/releases/download/v1.0.0/install.sh -O - | sudo bash
+```
+
+> 该命令会下载 `install.sh` 并直接以 `sudo bash` 执行。因 stdin 非终端，
+> 脚本默认执行**非交互安装**。系统需具备 `wget`/`curl` 与 `sudo`。
+
+脚本会自动完成：
+
+1. **检测 web 目录**——依据 `transmission-daemon` 版本自动选择
+   `public_html/`（≥ 3.0）或 `web/`（< 3.0），也支持
+   `TRANSMISSION_WEB_HOME` 环境变量或命令行参数指定目录；
+2. **下载预构建包**并从 GitHub Release 解压安装；
+3. **备份原界面**——原 `index.html` 保存为 `index.original.html`；
+4. **清理重装**——重装时移除上次生成的残留文件，保证幂等。
+
+**回滚到原版界面**（需先保存 install.sh）：
+
+```sh
+wget https://github.com/sysit/transmission-web-control-ng/releases/download/v1.0.0/install.sh -O install.sh
+sudo bash install.sh revert
+```
+
+> 从 Release 下载的安装脚本源码位于 `release/install-tr-control-ng.sh`。
+
 ## 开发
 
 ```sh
