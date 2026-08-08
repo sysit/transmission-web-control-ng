@@ -46,7 +46,7 @@ export default function ChangeDownloadDirDialog({ open, torrentIds, currentDir, 
       okText="Change" cancelText="Cancel">
       <div style={{ marginBottom: 4 }}>
         <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>Current directory</div>
-        <div style={{ fontSize: 12, color: '#000', wordBreak: 'break-all' }}>{currentDir || '—'}</div>
+        <div style={{ fontSize: 12, color: 'var(--eui-body-text)', wordBreak: 'break-all' }}>{currentDir || '—'}</div>
       </div>
       <div style={{ marginBottom: 12 }}>
         <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>New directory</div>

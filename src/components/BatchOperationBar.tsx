@@ -21,8 +21,8 @@ export default function BatchOperationBar({ selectedIds, onReplaceTracker, onCha
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 4,
-      padding: '4px 12px', background: '#e6f4ff',
-      borderBottom: '1px solid #91caff', fontSize: 12,
+      padding: '4px 12px', background: 'var(--eui-hover-bg)',
+      borderBottom: '1px solid var(--eui-hover-border)', fontSize: 12,
     }}>
       <span style={{ fontWeight: 600 }}>{selectedIds.length} selected</span>
       <Space size={4} style={{ marginLeft: 8 }}>

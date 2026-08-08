@@ -104,9 +104,9 @@ export default function InfoTab({ torrent, onChangeDownloadDir }: Props) {
         style={{ fontSize: 11 }}
         styles={{
           label: {
-            fontSize: 11, fontWeight: 'normal', color: '#555',
+            fontSize: 11, fontWeight: 'normal', color: 'var(--eui-item-text)',
             textAlign: 'right', padding: '1px 6px', width: 100,
-            background: '#f8f8f8',
+            background: 'var(--eui-content-bg)',
           },
           content: { fontSize: 11, padding: '1px 6px' },
         }}

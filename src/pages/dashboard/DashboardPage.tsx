@@ -320,7 +320,7 @@ export default function DashboardPage() {
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
           />
           <Space size="small">
-            <span style={{ fontSize: 11, color: '#999' }}>Theme:</span>
+            <span style={{ fontSize: 11, color: 'var(--eui-item-text)' }}>Theme:</span>
             <Select size="small" value={themeName} style={{ width: 90 }}
               onChange={setThemeName}
               options={[
@@ -542,7 +542,7 @@ export default function DashboardPage() {
             </>
           ) : (
             <div className="detail-toggle-bar detail-toggle-bar--empty">
-              <span className="detail-toggle-text" style={{ color: '#999' }}>
+              <span className="detail-toggle-text">
                 Select a torrent to view details
               </span>
             </div>

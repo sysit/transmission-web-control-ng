@@ -88,7 +88,7 @@ export default function ImportConfigDialog({ open, onClose }: Props) {
               if (f) handleFile(f);
               e.target.value = '';
             }} />
-          <span style={{ fontSize: 12, color: '#0E2D5F' }}>Choose config file…</span>
+          <span style={{ fontSize: 12, color: 'var(--eui-accent)' }}>Choose config file…</span>
         </label>
         {fileName && <span style={{ fontSize: 12, color: '#666', marginLeft: 8 }}>{fileName}</span>}
       </div>

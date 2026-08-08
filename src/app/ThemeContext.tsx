@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useMemo } from 'react';
+import { createContext, useContext, useState, useMemo, useEffect } from 'react';
 import type { ThemeConfig } from 'antd';
 import { theme } from 'antd';
 
@@ -314,48 +314,53 @@ export const THEME_DEFS: Record<string, ThemeConfig> = {
   gray: {
     token: {
       ...COMPACT_TOKENS,
-      colorPrimary: '#666',
-      colorInfo: '#666',
+      colorPrimary: '#575765',
+      colorInfo: '#575765',
       colorSuccess: '#3c8b3c',
       colorWarning: '#cc9900',
       colorError: '#bf4040',
-      colorLink: '#555',
-      colorLinkHover: '#777',
-      colorBgContainer: '#f5f5f5',
+      colorLink: '#0092dc',
+      colorLinkHover: '#0070a9',
+      colorBgContainer: '#f8f8f8',
       colorBgElevated: '#fff',
-      colorBgLayout: '#eee',
-      colorBorder: '#ccc',
-      colorBorderSecondary: '#ddd',
-      colorSplit: '#e8e8e8',
-      colorText: '#333',
-      colorTextSecondary: '#777',
+      colorBgLayout: '#f3f3f3',
+      colorBorder: '#d3d3d3',
+      colorBorderSecondary: '#e2e2e2',
+      colorSplit: '#e2e2e2',
+      colorText: '#000',
+      colorTextSecondary: '#575765',
     },
     components: {
       ...COMPACT_COMPONENTS,
       Table: {
         ...COMPACT_COMPONENTS.Table,
-        headerBg: '#e8e8e8',
-        rowHoverBg: 'rgba(100,100,100,0.06)',
-        rowSelectedBg: 'rgba(100,100,100,0.1)',
+        headerBg: '#f3f3f3',
+        headerColor: '#000',
+        rowHoverBg: 'rgba(0,146,220,0.06)',
+        rowSelectedBg: 'rgba(0,146,220,0.12)',
       },
     },
   },
 
-  // Metro — matches EasyUI "metro" theme: flat green, square corners
+  // Metro — matches EasyUI "metro-green" theme: flat olive-green, square corners
   metro: {
     token: {
       ...COMPACT_TOKENS,
-      colorPrimary: '#27ae60',
-      colorInfo: '#27ae60',
-      colorSuccess: '#27ae60',
-      colorWarning: '#f39c12',
-      colorError: '#e74c3c',
-      colorLink: '#27ae60',
-      colorLinkHover: '#2ecc71',
-      colorBgContainer: '#fff',
-      colorBgElevated: '#fff',
-      colorBgLayout: '#f5fff5',
-      colorBorder: '#d0d0d0',
+      colorPrimary: '#b1c242',
+      colorInfo: '#b1c242',
+      colorSuccess: '#b1c242',
+      colorWarning: '#d4a017',
+      colorError: '#bf4040',
+      colorLink: '#b1c242',
+      colorLinkHover: '#859416',
+      colorBgContainer: '#fafafa',
+      colorBgElevated: '#fafafa',
+      colorBgLayout: '#fafafa',
+      colorBorder: '#ddd',
+      colorBorderSecondary: '#e5f0c9',
+      colorSplit: '#e5f0c9',
+      colorText: '#404040',
+      colorTextSecondary: '#808040',
       borderRadius: 0,
       borderRadiusSM: 0,
       borderRadiusLG: 0,
@@ -364,9 +369,10 @@ export const THEME_DEFS: Record<string, ThemeConfig> = {
       ...COMPACT_COMPONENTS,
       Table: {
         ...COMPACT_COMPONENTS.Table,
-        headerBg: '#f0fff0',
-        rowHoverBg: 'rgba(39,174,96,0.04)',
-        rowSelectedBg: 'rgba(39,174,96,0.08)',
+        headerBg: '#e5f0c9',
+        headerColor: '#404040',
+        rowHoverBg: 'rgba(177,194,66,0.10)',
+        rowSelectedBg: '#c8d47b',
       },
     },
   },
@@ -394,7 +400,8 @@ export const THEME_DEFS: Record<string, ThemeConfig> = {
       ...COMPACT_COMPONENTS,
       Table: {
         ...COMPACT_COMPONENTS.Table,
-        headerBg: '#f9f9f9',
+        headerBg: '#F2F2F2',
+        headerColor: '#333',
         rowHoverBg: 'rgba(51,122,183,0.06)',
         rowSelectedBg: 'rgba(51,122,183,0.1)',
       },
@@ -432,13 +439,13 @@ export const THEME_DEFS: Record<string, ThemeConfig> = {
       ...COMPACT_COMPONENTS,
       Table: {
         ...COMPACT_COMPONENTS.Table,
-        headerBg: '#1f1f1f',
-        headerColor: 'rgba(255,255,255,0.85)',
-        headerSplitColor: '#303030',
+        headerBg: '#383838',
+        headerColor: '#fff',
+        headerSplitColor: '#383838',
         rowHoverBg: 'rgba(23,125,220,0.12)',
         rowSelectedBg: 'rgba(23,125,220,0.16)',
-        borderColor: '#434343',
-        stickyScrollBarBg: '#1f1f1f',
+        borderColor: '#444',
+        stickyScrollBarBg: '#383838',
       },
       Layout: {
         ...COMPACT_COMPONENTS.Layout,
@@ -484,7 +491,16 @@ export function useAppTheme() {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [themeName, setThemeName] = useState('default');
+  const [themeName, setThemeName] = useState(
+    () => localStorage.getItem('tr-web-control-theme') ?? 'default',
+  );
+
+  // Wire the active theme to CSS: `body[data-theme='<name>']` drives the
+  // --eui-* variable blocks in global.css (Task #8: theme chrome theming).
+  useEffect(() => {
+    document.body.dataset.theme = themeName;
+    localStorage.setItem('tr-web-control-theme', themeName);
+  }, [themeName]);
 
   const themeConfig = useMemo(() => {
     const base = THEME_DEFS[themeName] ?? THEME_DEFS.default;

@@ -107,16 +107,16 @@ export default function DropZone() {
       pointerEvents: 'none',
     }}>
       <div style={{
-        background: '#fff', borderRadius: 12,
+        background: 'var(--eui-panel-bg)', borderRadius: 12,
         padding: '48px 80px', textAlign: 'center',
         boxShadow: '0 8px 40px rgba(0,0,0,0.25)',
-        border: '3px dashed #1890ff',
+        border: '3px dashed var(--eui-accent-hover)',
       }}>
         <LegacyIcon name="add-torrent" size={64} style={{ marginBottom: 16 }} />
-        <div style={{ fontSize: 20, fontWeight: 700, color: '#333' }}>
+        <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--eui-body-text)' }}>
           Drop .torrent files here to add them
         </div>
-        <div style={{ fontSize: 13, color: '#999', marginTop: 8 }}>
+        <div style={{ fontSize: 13, color: 'var(--eui-item-text)', marginTop: 8 }}>
           Press Esc to cancel
         </div>
       </div>

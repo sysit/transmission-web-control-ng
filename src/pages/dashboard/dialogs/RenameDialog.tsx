@@ -41,7 +41,7 @@ export default function RenameDialog({ open, ids, currentName, onClose }: Props)
       confirmLoading={saving} destroyOnClose okText="Rename" cancelText="Cancel">
       <div style={{ marginBottom: 8 }}>
         <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>Old name</div>
-        <div style={{ fontSize: 12, color: '#000', wordBreak: 'break-all' }}>{currentName}</div>
+        <div style={{ fontSize: 12, color: 'var(--eui-body-text)', wordBreak: 'break-all' }}>{currentName}</div>
       </div>
       <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>New name</div>
       <TextArea rows={2} value={name} onChange={(e) => setName(e.target.value)} />

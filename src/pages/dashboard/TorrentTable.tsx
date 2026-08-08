@@ -409,7 +409,7 @@ export default function TorrentTable({
           onContextMenu: (e) => { e.preventDefault(); onContextMenu(record, e); },
           onClick: () => { if (onRowSelect) onRowSelect(record); },
           style: record.id === selectedTorrentId
-            ? { background: '#e6f4ff' }
+            ? { background: 'var(--eui-row-active-bg)' }
             : undefined,
         })}
         style={{ flex: 1 }}

@@ -90,7 +90,7 @@ export default function AboutDialog({ open, onClose }: Props) {
         <Space size="small" wrap style={{ justifyContent: 'center', fontSize: 12 }}>
           {thanks.map((t) => (
             <a key={t.label} href={t.href} target="_blank" rel="noreferrer"
-              style={{ fontSize: 12, color: '#0E2D5F' }}>{t.label}</a>
+              style={{ fontSize: 12, color: 'var(--eui-accent)' }}>{t.label}</a>
           ))}
         </Space>
       </div>

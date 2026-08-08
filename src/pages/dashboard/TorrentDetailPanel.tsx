@@ -59,15 +59,15 @@ export default function TorrentDetailPanel({ torrentId, torrent, open, onClose }
   return (
     <>
       {/* Panel body */}
-      <div style={{ height: panelHeight, background: '#fff',
-        borderTop: '1px solid #d0d0d0', display: 'flex', flexDirection: 'column',
+      <div style={{ height: panelHeight, background: 'var(--eui-panel-bg)',
+        borderTop: '1px solid var(--eui-border)', display: 'flex', flexDirection: 'column',
         overflow: 'hidden' }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '2px 8px', background: '#f0f0f0', borderBottom: '1px solid #d0d0d0', height: 26 }}>
+          padding: '2px 8px', background: 'var(--eui-content-bg)', borderBottom: '1px solid var(--eui-toolbar-border-top)', height: 26 }}>
           <Space size={4}>
             <Text strong style={{ fontSize: 12 }}>Torrent #{torrentId}</Text>
-            {torrent && <Text style={{ fontSize: 12, color: '#666' }} ellipsis>— {torrent.name}</Text>}
+            {torrent && <Text style={{ fontSize: 12, color: 'var(--eui-item-text)' }} ellipsis>— {torrent.name}</Text>}
           </Space>
           <Button type="text" size="small" icon={<LegacyIcon name="close" size={14} />} onClick={onClose}
             style={{ fontSize: 12 }} />
@@ -89,7 +89,7 @@ export default function TorrentDetailPanel({ torrentId, torrent, open, onClose }
                     <div style={{ display: 'flex', justifyContent: 'center',
                       alignItems: 'center', height: '100%', minHeight: 120 }}>
                       <Spin size="small" />
-                      <span style={{ marginLeft: 8, fontSize: 12, color: '#999' }}>
+                      <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--eui-item-text)' }}>
                         Loading {item.key}…
                       </span>
                     </div>
