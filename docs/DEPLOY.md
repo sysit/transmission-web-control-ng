@@ -43,18 +43,20 @@ scp -r dist/* user@nas:/usr/share/transmission/web/
 cp -r dist/* /usr/share/transmission/web/
 ```
 
-### 方式二：使用安装脚本
+### 方式二：使用在线安装脚本
 
 ```sh
-# 将整个项目复制到目标机，然后
-cd transmission-web-control-ng
-sh release/install-new-ui.sh
+# 安装 GitHub Release 的预构建版本（无需 Node/构建工具）
+wget https://github.com/sysit/transmission-web-control-ng/releases/download/v1.0.0/install.sh -O - | sudo bash
 ```
 
-脚本会：
-1. 自动检测 Transmission web 目录
-2. 备份原始 `index.html` → `index.original.html`
-3. 复制构建产物
+或本地直接执行（脚本源码在 `release/install-tr-control-ng.sh`）。脚本会：
+1. 自动检测 Transmission web 目录（版本感知：≥3.0 → `public_html`，<3.0 → `web`）
+2. 下载预构建包并备份原始 `index.html` → `index.original.html`
+3. 清理上次残留后安装（幂等）
+4. 回滚：`sudo bash install.sh revert`
+
+> 若需部署**本地刚构建**的 `dist/`，请用方式一（scp/cp）。
 
 ### 方式三：打包传输
 
@@ -79,9 +81,8 @@ cp -r dist/* /usr/share/transmission/web/
 ## 回滚
 
 ```sh
-# 如果之前用 install-new-ui.sh 安装过
-cd transmission-web-control-ng
-sh release/install-new-ui.sh   # 选择 2) Revert
+# 如果之前用在线安装脚本装过
+sudo bash install.sh revert   # 或本地: bash release/install-tr-control-ng.sh revert
 
 # 手动回滚
 cd /usr/share/transmission/web
