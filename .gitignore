@@ -31,3 +31,10 @@ dist-ssr
 
 # 本地构建的 Release 成品包（上传 GitHub Release，不入库）
 tr-web-control-ng.tar.gz
+
+# 开发内部文档（仅供本地参考，不入库）
+/CLAUDE.md
+/docs/CONTINUATION_LOG.md
+/docs/FUNCTION_MAP.md
+/docs/LEGACY_EASYUI_ARCHITECTURE.md
+/docs/REFACTOR_PLAN.md
