@@ -8,6 +8,7 @@ import {
 } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import i18nInstance from '@/core/i18n';
 import { useSessionConfig } from '@/hooks/useTorrents';
 import { exec as rpcExec } from '@/core/rpc/transmission-client';
 import { useConfigStore, resetConfig } from '@/core/config/config-store';
@@ -24,7 +25,7 @@ interface Props {
 export default function SettingsDialog({ open, onClose }: Props) {
   const { data: sessionConfig, isLoading } = useSessionConfig();
   const { message } = App.useApp();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -423,7 +424,7 @@ export default function SettingsDialog({ open, onClose }: Props) {
             <Select size="small" value={localConfig.language} className="settings-dialog-input-140"
               onChange={(v) => {
                 useConfigStore.setState({ language: v });
-                void i18n.changeLanguage(v);
+                void i18nInstance.changeLanguage(v);
               }}
               options={[
                 { value: 'zh_CN', label: '简体中文' },

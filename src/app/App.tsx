@@ -8,6 +8,9 @@ import { useTranslation } from 'react-i18next';
 import { routes } from './routes.tsx';
 import { ThemeProvider, useAppTheme } from './ThemeContext';
 import { useConfigStore } from '@/core/config/config-store';
+// Side-effect import: initializes i18next (registers the global instance via
+// initReactI18next). Without this, useTranslation() has no instance at all.
+import i18n from '../core/i18n';
 import DropZone from '@/components/DropZone';
 
 const { Paragraph } = Typography;
@@ -57,11 +60,13 @@ function ThemedApp() {
 
   // Persisted language choice drives i18next (the detector is only the
   // initial default; the store is the source of truth).
+  // Call changeLanguage on the REAL instance — useTranslation() returns a
+  // wrapped object that doesn't carry the full i18next API.
   useEffect(() => {
-    if (language && boundI18n.language !== language) {
-      void boundI18n.changeLanguage(language);
+    if (language && i18n.language !== language) {
+      void i18n.changeLanguage(language);
     }
-  }, [language, boundI18n]);
+  }, [language]);
 
   return (
     <ConfigProvider theme={themeConfig} locale={boundI18n.language === 'en' ? enUS : zhCN}>
