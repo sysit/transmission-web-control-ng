@@ -2,7 +2,8 @@
 // Called by TorrentDetailPanel when the "Config" tab is active
 
 import { useState, useCallback, useEffect } from 'react';
-import { Checkbox, InputNumber, Button, Typography, Space, message } from 'antd';
+import { Checkbox, InputNumber, Button, Typography, Space, App } from 'antd';
+import { useTranslation } from 'react-i18next';
 import type { Torrent } from '@/core/rpc/rpc-types';
 import { exec as rpcExec } from '@/core/rpc/transmission-client';
 
@@ -43,18 +44,21 @@ function TriStateCheckbox({ value, onChange }: {
   value: number;
   onChange: (v: number) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Checkbox
       checked={value === 1}
       indeterminate={value === 0}
       onChange={() => onChange(value === 0 ? 1 : value === 1 ? 2 : 0)}
     >
-      {value === 0 ? 'Global' : value === 1 ? 'Enabled' : 'Disabled'}
+      {value === 0 ? t('configTab.global') : value === 1 ? t('configTab.enabled') : t('configTab.disabled')}
     </Checkbox>
   );
 }
 
 export default function ConfigTab({ torrent }: Props) {
+  const { t } = useTranslation();
+  const { message } = App.useApp();
   const [config, setConfig] = useState<ConfigState | null>(null);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<'saved' | 'nochange' | null>(null);
@@ -62,33 +66,36 @@ export default function ConfigTab({ torrent }: Props) {
   useEffect(() => {
     if (torrent) { setConfig(getInitState(torrent)); setFeedback(null); }
     else { setConfig(null); }
-  }, [torrent]);
+    // Seed only when switching torrents — the torrent object identity churns
+    // every 5s poll, and re-seeding here would silently wipe in-progress edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [torrent?.id]);
 
   const handleSave = useCallback(async () => {
     if (!torrent || !config) return;
     const changes: Record<string, unknown> = {};
-    const t = torrent;
-    if (config.downloadLimited !== (t.downloadLimited ?? false)) changes.downloadLimited = config.downloadLimited;
-    if (config.downloadLimit !== (t.downloadLimit ?? null)) changes.downloadLimit = config.downloadLimit;
-    if (config.uploadLimited !== (t.uploadLimited ?? false)) changes.uploadLimited = config.uploadLimited;
-    if (config.uploadLimit !== (t.uploadLimit ?? null)) changes.uploadLimit = config.uploadLimit;
-    if (config.seedRatioMode !== (t.seedRatioMode ?? 0)) changes.seedRatioMode = config.seedRatioMode;
-    if (config.seedRatioLimit !== (t.seedRatioLimit ?? null)) changes.seedRatioLimit = config.seedRatioLimit;
-    if (config.seedIdleMode !== (t.seedIdleMode ?? 0)) changes.seedIdleMode = config.seedIdleMode;
-    if (config.seedIdleLimit !== (t.seedIdleLimit ?? null)) changes.seedIdleLimit = config.seedIdleLimit;
-    if (config['peer-limit'] !== (t['peer-limit'] ?? null)) changes['peer-limit'] = config['peer-limit'];
+    const tor = torrent;
+    if (config.downloadLimited !== (tor.downloadLimited ?? false)) changes.downloadLimited = config.downloadLimited;
+    if (config.downloadLimit !== (tor.downloadLimit ?? null)) changes.downloadLimit = config.downloadLimit;
+    if (config.uploadLimited !== (tor.uploadLimited ?? false)) changes.uploadLimited = config.uploadLimited;
+    if (config.uploadLimit !== (tor.uploadLimit ?? null)) changes.uploadLimit = config.uploadLimit;
+    if (config.seedRatioMode !== (tor.seedRatioMode ?? 0)) changes.seedRatioMode = config.seedRatioMode;
+    if (config.seedRatioLimit !== (tor.seedRatioLimit ?? null)) changes.seedRatioLimit = config.seedRatioLimit;
+    if (config.seedIdleMode !== (tor.seedIdleMode ?? 0)) changes.seedIdleMode = config.seedIdleMode;
+    if (config.seedIdleLimit !== (tor.seedIdleLimit ?? null)) changes.seedIdleLimit = config.seedIdleLimit;
+    if (config['peer-limit'] !== (tor['peer-limit'] ?? null)) changes['peer-limit'] = config['peer-limit'];
 
     if (Object.keys(changes).length === 0) { setFeedback('nochange'); return; }
     setSaving(true);
     try {
       await rpcExec({ method: 'torrent-set', arguments: { ids: [torrent.id], ...changes } });
       setFeedback('saved');
-    } catch { message.error('Failed to save config'); }
+    } catch (e) { message.error(e instanceof Error ? e.message : t('configTab.failed')); }
     finally { setSaving(false); }
-  }, [torrent, config]);
+  }, [torrent, config, message, t]);
 
-  if (!torrent) return <Text type="secondary">Select a torrent</Text>;
-  if (!config) return <Text type="secondary">Loading…</Text>;
+  if (!torrent) return <Text type="secondary">{t('configTab.selectPrompt')}</Text>;
+  if (!config) return <Text type="secondary">{t('configTab.loading')}</Text>;
 
   const update = (key: keyof ConfigState, value: number | boolean | null) => {
     setConfig((prev) => prev ? { ...prev, [key]: value } : prev);
@@ -103,7 +110,7 @@ export default function ConfigTab({ torrent }: Props) {
             <td style={{ width: '30%', padding: 4, borderBottom: '1px solid #f0f0f0' }}>
               <Checkbox checked={config.downloadLimited}
                 onChange={(e) => update('downloadLimited', e.target.checked)}>
-                Download Limit
+                {t('configTab.dlLimit')}
               </Checkbox>
             </td>
             <td style={{ width: '20%', padding: 4, borderBottom: '1px solid #f0f0f0' }}>
@@ -114,7 +121,7 @@ export default function ConfigTab({ torrent }: Props) {
             <td style={{ width: '30%', padding: 4, borderBottom: '1px solid #f0f0f0' }}>
               <TriStateCheckbox value={config.seedRatioMode}
                 onChange={(v) => update('seedRatioMode', v)} />
-              <Text type="secondary" style={{ fontSize: 10 }}> Seed Ratio</Text>
+              <Text type="secondary" style={{ fontSize: 10 }}>{t('configTab.seedRatioMode')}</Text>
             </td>
             <td style={{ width: '20%', padding: 4, borderBottom: '1px solid #f0f0f0' }}>
               <InputNumber size="small" value={config.seedRatioLimit}
@@ -127,7 +134,7 @@ export default function ConfigTab({ torrent }: Props) {
             <td style={{ padding: 4, borderBottom: '1px solid #f0f0f0' }}>
               <Checkbox checked={config.uploadLimited}
                 onChange={(e) => update('uploadLimited', e.target.checked)}>
-                Upload Limit
+                {t('configTab.ulLimit')}
               </Checkbox>
             </td>
             <td style={{ padding: 4, borderBottom: '1px solid #f0f0f0' }}>
@@ -138,7 +145,7 @@ export default function ConfigTab({ torrent }: Props) {
             <td style={{ padding: 4, borderBottom: '1px solid #f0f0f0' }}>
               <TriStateCheckbox value={config.seedIdleMode}
                 onChange={(v) => update('seedIdleMode', v)} />
-              <Text type="secondary" style={{ fontSize: 10 }}> Seed Idle</Text>
+              <Text type="secondary" style={{ fontSize: 10 }}>{t('configTab.seedIdleMode')}</Text>
             </td>
             <td style={{ padding: 4, borderBottom: '1px solid #f0f0f0' }}>
               <InputNumber size="small" value={config.seedIdleLimit}
@@ -148,7 +155,7 @@ export default function ConfigTab({ torrent }: Props) {
           </tr>
           <tr>
             <td style={{ padding: 4 }}>
-              <Text style={{ fontSize: 12 }}>Peer Limit</Text>
+              <Text style={{ fontSize: 12 }}>{t('configTab.peerLimit')}</Text>
             </td>
             <td style={{ padding: 4 }}>
               <InputNumber size="small" value={config['peer-limit']}
@@ -160,9 +167,9 @@ export default function ConfigTab({ torrent }: Props) {
       </table>
       <div style={{ marginTop: 8 }}>
         <Space>
-          <Button size="small" type="primary" loading={saving} onClick={handleSave}>Save</Button>
-          {feedback === 'saved' && <Text type="success" style={{ fontSize: 12 }}>Saved</Text>}
-          {feedback === 'nochange' && <Text type="secondary" style={{ fontSize: 12 }}>No changes</Text>}
+          <Button size="small" type="primary" loading={saving} onClick={handleSave}>{t('configTab.save')}</Button>
+          {feedback === 'saved' && <Text type="success" style={{ fontSize: 12 }}>{t('configTab.savedShort')}</Text>}
+          {feedback === 'nochange' && <Text type="secondary" style={{ fontSize: 12 }}>{t('configTab.noChangeShort')}</Text>}
         </Space>
       </div>
     </div>

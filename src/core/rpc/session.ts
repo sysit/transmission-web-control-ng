@@ -7,6 +7,14 @@ interface SessionConfig {
   password?: string;
 }
 
+/** UTF-8-safe base64 — btoa() throws on non-Latin1 chars (e.g. CJK passwords). */
+function base64Utf8(s: string): string {
+  const bytes = new TextEncoder().encode(s);
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
 class Session {
   private sessionId: string = '';
   private rpcPath: string;
@@ -16,7 +24,7 @@ class Session {
     this.rpcPath = config.rpcPath;
     if (config.username && config.password) {
       this.headers['Authorization'] =
-        'Basic ' + btoa(config.username + ':' + config.password);
+        'Basic ' + base64Utf8(config.username + ':' + config.password);
     }
   }
 

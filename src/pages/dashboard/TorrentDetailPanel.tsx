@@ -3,7 +3,9 @@
 
 import { useState } from 'react';
 import { Tabs, Button, Typography, Space, Spin } from 'antd';
+import { useTranslation } from 'react-i18next';
 import LegacyIcon from '@/components/LegacyIcon';
+import { useConfigStore } from '@/core/config/config-store';
 import type { Torrent } from '@/core/rpc/rpc-types';
 import { useTorrentDetail } from '@/hooks/useTorrents';
 import InfoTab from './tabs/InfoTab';
@@ -24,49 +26,55 @@ interface Props {
 }
 
 export default function TorrentDetailPanel({ torrentId, torrent, open, onClose }: Props) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('info');
-  const [panelHeight] = useState(280);
   const [addTrackerOpen, setAddTrackerOpen] = useState(false);
   const [changeDirOpen, setChangeDirOpen] = useState(false);
 
-  const { data: extendedTorrent } = useTorrentDetail(torrentId, open);
+  // Poll while open — the old UI refreshed the attribute panel on the same
+  // timer as the list; without this the tabs freeze on open-time data.
+  const { data: extendedTorrent } = useTorrentDetail(torrentId, open, {
+    refetchInterval: useConfigStore.getState().autoReload
+      ? useConfigStore.getState().autoReloadInterval * 1000
+      : false,
+  });
   const mergedTorrent: Torrent | undefined = extendedTorrent ?? torrent;
   const hasDetailData = !!extendedTorrent;
 
   if (!open) return null;
 
   const tabItems = [
-    { key: 'info', label: 'Info',
+    { key: 'info', label: t('detail.info'),
       children: <InfoTab torrent={mergedTorrent}
         onChangeDownloadDir={() => setChangeDirOpen(true)} /> },
-    { key: 'trackers', label: 'Trackers',
+    { key: 'trackers', label: t('detail.trackers'),
       children: <TrackersTab torrentId={torrentId}
         trackerStats={mergedTorrent?.trackerStats}
         onAddTracker={() => setAddTrackerOpen(true)} /> },
-    { key: 'files', label: 'Files',
+    { key: 'files', label: t('detail.files'),
       children: <FilesTab torrentId={torrentId}
         torrentName={mergedTorrent?.name ?? ''}
         files={mergedTorrent?.files}
         fileStats={mergedTorrent?.fileStats} /> },
-    { key: 'peers', label: 'Peers',
+    { key: 'peers', label: t('detail.peers'),
       children: <PeersTab peers={mergedTorrent?.peers} /> },
-    { key: 'config', label: 'Config',
+    { key: 'config', label: t('detail.config'),
       children: <ConfigTab torrent={mergedTorrent} /> },
   ];
 
-  const tabContentHeight = panelHeight - 55;
+  const tabContentHeight = 280 - 55;
 
   return (
     <>
       {/* Panel body */}
-      <div style={{ height: panelHeight, background: 'var(--eui-panel-bg)',
+      <div style={{ height: 280, background: 'var(--eui-panel-bg)',
         borderTop: '1px solid var(--eui-border)', display: 'flex', flexDirection: 'column',
         overflow: 'hidden' }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '2px 8px', background: 'var(--eui-content-bg)', borderBottom: '1px solid var(--eui-toolbar-border-top)', height: 26 }}>
           <Space size={4}>
-            <Text strong style={{ fontSize: 12 }}>Torrent #{torrentId}</Text>
+            <Text strong style={{ fontSize: 12 }}>{t('detail.torrentId', { id: torrentId })}</Text>
             {torrent && <Text style={{ fontSize: 12, color: 'var(--eui-item-text)' }} ellipsis>— {torrent.name}</Text>}
           </Space>
           <Button type="text" size="small" icon={<LegacyIcon name="close" size={14} />} onClick={onClose}

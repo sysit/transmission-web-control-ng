@@ -2,7 +2,7 @@
 // Replicates old dialog-torrent-remove-confirm.html
 
 import { useEffect, useState } from 'react';
-import { Modal, Checkbox, message } from 'antd';
+import { Modal, Checkbox, App } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { useRemoveTorrent } from '@/hooks/useTorrents';
 
@@ -14,6 +14,7 @@ interface Props {
 }
 
 export default function RemoveTorrentDialog({ open, ids, initialDeleteData = false, onClose }: Props) {
+  const { message } = App.useApp();
   const { t } = useTranslation();
   const removeTorrent = useRemoveTorrent();
   const [deleteData, setDeleteData] = useState(initialDeleteData);

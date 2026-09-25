@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { Modal, App } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { exec as rpcExec } from '@/core/rpc/transmission-client';
 import { useConfigStore } from '@/core/config/config-store';
 import type { UserLabel } from '@/core/config/config-store';
@@ -26,6 +27,7 @@ function textColor(hex: string): string {
 }
 
 export default function SetLabelsDialog({ open, ids, currentLabels, onClose }: Props) {
+  const { t } = useTranslation();
   const labels = useConfigStore((s) => s.labels);
   const { message } = App.useApp();
   const [selected, setSelected] = useState<string[]>([]);
@@ -54,24 +56,24 @@ export default function SetLabelsDialog({ open, ids, currentLabels, onClose }: P
     setSaving(true);
     try {
       await rpcExec({ method: 'torrent-set', arguments: { ids, labels: selected } });
-      message.success('Labels updated');
+      message.success(t('setLabels.done'));
       onClose();
-    } catch { message.error('Failed to update labels'); }
+    } catch (e) { message.error(e instanceof Error ? e.message : t('setLabels.failed')); }
     finally { setSaving(false); }
   };
 
   return (
-    <Modal title="Set Labels" open={open} onOk={handleOk} onCancel={onClose}
-      confirmLoading={saving} destroyOnClose okText="Apply" cancelText="Cancel"
+    <Modal title={t('setLabels.title')} open={open} onOk={handleOk} onCancel={onClose}
+      confirmLoading={saving} destroyOnHidden okText={t('setLabels.ok')} cancelText={t('setLabels.cancel')}
       width={560}>
       {labels.length === 0 && (
         <div style={{ fontSize: 12, color: '#999', marginBottom: 12 }}>
-          No labels defined yet. Add them in Settings → User Labels.
+          {t('setLabels.noLabels')}
         </div>
       )}
       <div style={{ display: 'flex', gap: 12 }}>
         <div style={{ flex: 1, border: '1px solid #d0d0d0', borderRadius: 2, padding: 8, minHeight: 160 }}>
-          <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>Available</div>
+          <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>{t('setLabels.available')}</div>
           <div>
             {available.length === 0 ? (
               <div style={{ fontSize: 12, color: '#aaa' }}>—</div>
@@ -79,7 +81,7 @@ export default function SetLabelsDialog({ open, ids, currentLabels, onClose }: P
           </div>
         </div>
         <div style={{ flex: 1, border: '1px solid #d0d0d0', borderRadius: 2, padding: 8, minHeight: 160 }}>
-          <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>Selected</div>
+          <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>{t('setLabels.current')}</div>
           <div>
             {selectedLabels.length === 0 ? (
               <div style={{ fontSize: 12, color: '#aaa' }}>—</div>

@@ -6,6 +6,8 @@ import {
   Modal, Tabs, Form, Select, InputNumber, Switch, Button, Input,
   Typography, Space, Divider, Row, Col, App,
 } from 'antd';
+import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useSessionConfig } from '@/hooks/useTorrents';
 import { exec as rpcExec } from '@/core/rpc/transmission-client';
 import { useConfigStore, resetConfig } from '@/core/config/config-store';
@@ -22,9 +24,25 @@ interface Props {
 export default function SettingsDialog({ open, onClose }: Props) {
   const { data: sessionConfig, isLoading } = useSessionConfig();
   const { message } = App.useApp();
+  const { t, i18n } = useTranslation();
+  const qc = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [form] = Form.useForm();
+  // Reactive field watches — form.getFieldValue() in render does not
+  // re-render on change, freezing all conditionally-disabled inputs.
+  const incompleteDirEnabled = Form.useWatch('incomplete-dir-enabled', form);
+  const scriptDoneEnabled = Form.useWatch('script-torrent-done-enabled', form);
+  const downloadQueueEnabled = Form.useWatch('download-queue-enabled', form);
+  const seedQueueEnabled = Form.useWatch('seed-queue-enabled', form);
+  const randomPort = Form.useWatch('peer-port-random-on-start', form);
+  const blocklistEnabled = Form.useWatch('blocklist-enabled', form);
+  const dlLimitEnabled = Form.useWatch('speed-limit-down-enabled', form);
+  const ulLimitEnabled = Form.useWatch('speed-limit-up-enabled', form);
+  const seedRatioLimited = Form.useWatch('seedRatioLimited', form);
+  const idleSeedEnabled = Form.useWatch('idle-seeding-limit-enabled', form);
+  const stalledQueueEnabled = Form.useWatch('queue-stalled-enabled', form);
+  const altSpeedTimeEnabled = Form.useWatch('alt-speed-time-enabled', form);
   const localConfig = useConfigStore();
 
   useEffect(() => {
@@ -44,34 +62,39 @@ export default function SettingsDialog({ open, onClose }: Props) {
     }
 
     if (Object.keys(changes).length === 0) {
-      message.info('No changes to save');
+      message.info(t('settings.noChanges'));
       return;
     }
 
     setSaving(true);
     try {
       await rpcExec({ method: 'session-set', arguments: changes });
-      message.success('Settings saved');
+      // Refetch now, else reopening the dialog re-seeds the form with the
+      // stale cached config (staleTime 30s) and re-saving reverts changes.
+      await qc.invalidateQueries({ queryKey: ['session', 'config'] });
+      message.success(t('settings.saved'));
       onClose();
-    } catch {
-      message.error('Failed to save settings');
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : t('settings.saveFailed'));
     } finally {
       setSaving(false);
     }
-  }, [form, sessionConfig, message, onClose]);
+  }, [form, sessionConfig, message, onClose, qc, t]);
 
   const handleTestPort = useCallback(async () => {
     try {
-      const result = await rpcExec({ method: 'port-test' });
-      if (result) {
-        message.success('Port is open');
+      const resp = await rpcExec<Record<string, never>, { 'port-is-open'?: boolean }>({
+        method: 'port-test',
+      });
+      if (resp.arguments['port-is-open']) {
+        message.success(t('settings.portOpen'));
       } else {
-        message.warning('Port is closed');
+        message.warning(t('settings.portClosed'));
       }
-    } catch {
-      message.error('Port test failed');
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : t('settings.portTestFailed'));
     }
-  }, [message]);
+  }, [message, t]);
 
   const handleBlocklistUpdate = useCallback(async () => {
     try {
@@ -88,10 +111,10 @@ export default function SettingsDialog({ open, onClose }: Props) {
   const tabItems = [
     {
       key: 'basic',
-      label: 'Basic',
+      label: t('settings.tabs.basic'),
       children: (
         <div className="settings-dialog-pane">
-          <Form.Item name="download-dir" label="Download Directory">
+          <Form.Item name="download-dir" label={t('settings.downloadDir')}>
             <Select size="small" showSearch options={(
               sessionConfig?.['download-dir']
                 ? [{ value: sessionConfig['download-dir'], label: sessionConfig['download-dir'] }]
@@ -99,32 +122,32 @@ export default function SettingsDialog({ open, onClose }: Props) {
             )} />
           </Form.Item>
 
-          <Form.Item name="incomplete-dir-enabled" label="Incomplete Dir" valuePropName="checked">
+          <Form.Item name="incomplete-dir-enabled" label={t('settings.incompleteDir')} valuePropName="checked">
             <Switch size="small" />
           </Form.Item>
-          <Form.Item name="incomplete-dir" label="Path">
-            <Input size="small" disabled={!form.getFieldValue('incomplete-dir-enabled')} />
+          <Form.Item name="incomplete-dir" label={t('settings.path')}>
+            <Input size="small" disabled={!incompleteDirEnabled} />
           </Form.Item>
 
-          <Form.Item name="rename-partial-files" label='Append ".part" to files' valuePropName="checked">
+          <Form.Item name="rename-partial-files" label={t('settings.appendPart')} valuePropName="checked">
             <Switch size="small" />
           </Form.Item>
-          <Form.Item name="start-added-torrents" label="Start when added" valuePropName="checked">
+          <Form.Item name="start-added-torrents" label={t('settings.startAdded')} valuePropName="checked">
             <Switch size="small" />
           </Form.Item>
 
-          <Form.Item name="cache-size-mb" label="Disk Cache (MB)">
+          <Form.Item name="cache-size-mb" label={t('settings.cacheSize')}>
             <InputNumber size="small" min={0} max={9999} />
           </Form.Item>
 
-          <Form.Item name="script-torrent-done-enabled" label="Script on completion" valuePropName="checked">
+          <Form.Item name="script-torrent-done-enabled" label={t('settings.scriptDone')} valuePropName="checked">
             <Switch size="small" />
           </Form.Item>
-          <Form.Item name="script-torrent-done-filename" label="Script Path">
-            <Input size="small" disabled={!form.getFieldValue('script-torrent-done-enabled')} />
+          <Form.Item name="script-torrent-done-filename" label={t('settings.scriptPath')}>
+            <Input size="small" disabled={!scriptDoneEnabled} />
           </Form.Item>
 
-          <Form.Item label="Config Directory">
+          <Form.Item label={t('settings.configDir')}>
             <Input size="small" value={(sessionConfig?.['config-dir'] as string) ?? ''} disabled />
           </Form.Item>
         </div>
@@ -132,62 +155,62 @@ export default function SettingsDialog({ open, onClose }: Props) {
     },
     {
       key: 'network',
-      label: 'Network',
+      label: t('settings.tabs.network'),
       children: (
         <div className="settings-dialog-pane">
           <Row gutter={8}>
             <Col span={12}>
-              <Form.Item name="download-queue-enabled" label="Download Queue" valuePropName="checked">
+              <Form.Item name="download-queue-enabled" label={t('settings.downloadQueue')} valuePropName="checked">
                 <Switch size="small" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="download-queue-size" label="Size">
+              <Form.Item name="download-queue-size" label={t('settings.size')}>
                 <InputNumber size="small" min={0} className="settings-dialog-full"
-                  disabled={!form.getFieldValue('download-queue-enabled')} />
+                  disabled={!downloadQueueEnabled} />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={8}>
             <Col span={12}>
-              <Form.Item name="seed-queue-enabled" label="Seed Queue" valuePropName="checked">
+              <Form.Item name="seed-queue-enabled" label={t('settings.seedQueue')} valuePropName="checked">
                 <Switch size="small" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="seed-queue-size" label="Size">
+              <Form.Item name="seed-queue-size" label={t('settings.size')}>
                 <InputNumber size="small" min={0} className="settings-dialog-full"
-                  disabled={!form.getFieldValue('seed-queue-enabled')} />
+                  disabled={!seedQueueEnabled} />
               </Form.Item>
             </Col>
           </Row>
 
-          <Form.Item name="encryption" label="Encryption">
+          <Form.Item name="encryption" label={t('settings.encryption')}>
             <Select size="small" options={[
-              { value: 'required', label: 'Required' },
-              { value: 'preferred', label: 'Preferred' },
-              { value: 'tolerated', label: 'Tolerated' },
+              { value: 'required', label: t('settings.encRequired') },
+              { value: 'preferred', label: t('settings.encPreferred') },
+              { value: 'tolerated', label: t('settings.encTolerated') },
             ]} />
           </Form.Item>
 
           <Row gutter={8}>
             <Col span={16}>
-              <Form.Item name="peer-port-random-on-start" label="Random port on start" valuePropName="checked">
+              <Form.Item name="peer-port-random-on-start" label={t('settings.randomPort')} valuePropName="checked">
                 <Switch size="small" />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="peer-port" label="Port">
+              <Form.Item name="peer-port" label={t('settings.port')}>
                 <InputNumber size="small" min={1} max={65535} className="settings-dialog-full"
-                  disabled={form.getFieldValue('peer-port-random-on-start')} />
+                  disabled={randomPort} />
               </Form.Item>
             </Col>
           </Row>
           <div className="settings-dialog-actions-right">
-            <Button size="small" onClick={handleTestPort}>Test Port</Button>
+            <Button size="small" onClick={handleTestPort}>{t('settings.testPort')}</Button>
           </div>
 
-          <Form.Item name="port-forwarding-enabled" label="Port Forwarding (UPnP)" valuePropName="checked">
+          <Form.Item name="port-forwarding-enabled" label={t('settings.portForwarding')} valuePropName="checked">
             <Switch size="small" />
           </Form.Item>
 
@@ -204,15 +227,15 @@ export default function SettingsDialog({ open, onClose }: Props) {
             </span>
           )} labelCol={{ span: 24 }} />
 
-          <Form.Item name="blocklist-enabled" label="Blocklist" valuePropName="checked">
+          <Form.Item name="blocklist-enabled" label={t('settings.blocklist')} valuePropName="checked">
             <Switch size="small" />
           </Form.Item>
-          <Form.Item name="blocklist-url" label="URL">
-            <Input size="small" disabled={!form.getFieldValue('blocklist-enabled')}
+          <Form.Item name="blocklist-url" label={t('settings.url')}>
+            <Input size="small" disabled={!blocklistEnabled}
               suffix={
                 <Button size="small" type="link" onClick={handleBlocklistUpdate}
-                  disabled={!form.getFieldValue('blocklist-enabled')}
-                  className="settings-dialog-link-btn">Update</Button>
+                  disabled={!blocklistEnabled}
+                  className="settings-dialog-link-btn">{t('settings.update')}</Button>
               } />
           </Form.Item>
         </div>
@@ -220,81 +243,81 @@ export default function SettingsDialog({ open, onClose }: Props) {
     },
     {
       key: 'limit',
-      label: 'Limit',
+      label: t('settings.tabs.limit'),
       children: (
         <div className="settings-dialog-pane">
           <Row gutter={8}>
             <Col span={12}>
-              <Form.Item name="speed-limit-down-enabled" label="DL Limit" valuePropName="checked">
+              <Form.Item name="speed-limit-down-enabled" label={t('settings.dlLimit')} valuePropName="checked">
                 <Switch size="small" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="speed-limit-down" label="KB/s">
+              <Form.Item name="speed-limit-down" label={t('settings.kbs')}>
                 <InputNumber size="small" min={0} className="settings-dialog-full"
-                  disabled={!form.getFieldValue('speed-limit-down-enabled')} />
+                  disabled={!dlLimitEnabled} />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={8}>
             <Col span={12}>
-              <Form.Item name="speed-limit-up-enabled" label="UL Limit" valuePropName="checked">
+              <Form.Item name="speed-limit-up-enabled" label={t('settings.ulLimit')} valuePropName="checked">
                 <Switch size="small" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="speed-limit-up" label="KB/s">
+              <Form.Item name="speed-limit-up" label={t('settings.kbs')}>
                 <InputNumber size="small" min={0} className="settings-dialog-full"
-                  disabled={!form.getFieldValue('speed-limit-up-enabled')} />
+                  disabled={!ulLimitEnabled} />
               </Form.Item>
             </Col>
           </Row>
 
-          <Form.Item name="peer-limit-global" label="Global Peer Limit">
+          <Form.Item name="peer-limit-global" label={t('settings.peerLimitGlobal')}>
             <InputNumber size="small" min={0} max={99999} />
           </Form.Item>
-          <Form.Item name="peer-limit-per-torrent" label="Per-Torrent Peer Limit">
+          <Form.Item name="peer-limit-per-torrent" label={t('settings.peerLimitPerTorrent')}>
             <InputNumber size="small" min={0} max={99999} />
           </Form.Item>
 
           <Row gutter={8}>
             <Col span={12}>
-              <Form.Item name="seedRatioLimited" label="Seed Ratio" valuePropName="checked">
+              <Form.Item name="seedRatioLimited" label={t('settings.seedRatio')} valuePropName="checked">
                 <Switch size="small" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="seedRatioLimit" label="Ratio">
+              <Form.Item name="seedRatioLimit" label={t('settings.ratio')}>
                 <InputNumber size="small" min={0} step={0.1} className="settings-dialog-full"
-                  disabled={!form.getFieldValue('seedRatioLimited')} />
+                  disabled={!seedRatioLimited} />
               </Form.Item>
             </Col>
           </Row>
 
           <Row gutter={8}>
             <Col span={12}>
-              <Form.Item name="idle-seeding-limit-enabled" label="Idle Seeding" valuePropName="checked">
+              <Form.Item name="idle-seeding-limit-enabled" label={t('settings.idleSeeding')} valuePropName="checked">
                 <Switch size="small" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="idle-seeding-limit" label="Minutes">
+              <Form.Item name="idle-seeding-limit" label={t('settings.minutes')}>
                 <InputNumber size="small" min={0} className="settings-dialog-full"
-                  disabled={!form.getFieldValue('idle-seeding-limit-enabled')} />
+                  disabled={!idleSeedEnabled} />
               </Form.Item>
             </Col>
           </Row>
 
           <Row gutter={8}>
             <Col span={12}>
-              <Form.Item name="queue-stalled-enabled" label="Stalled Queue" valuePropName="checked">
+              <Form.Item name="queue-stalled-enabled" label={t('settings.stalledQueue')} valuePropName="checked">
                 <Switch size="small" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="queue-stalled-minutes" label="Minutes">
+              <Form.Item name="queue-stalled-minutes" label={t('settings.minutes')}>
                 <InputNumber size="small" min={0} className="settings-dialog-full"
-                  disabled={!form.getFieldValue('queue-stalled-enabled')} />
+                  disabled={!stalledQueueEnabled} />
               </Form.Item>
             </Col>
           </Row>
@@ -303,53 +326,53 @@ export default function SettingsDialog({ open, onClose }: Props) {
     },
     {
       key: 'altspeed',
-      label: 'Alt Speeds',
+      label: t('settings.tabs.altspeed'),
       children: (
         <div className="settings-dialog-pane">
-          <Form.Item name="alt-speed-enabled" label="Alt Speed Limits" valuePropName="checked">
+          <Form.Item name="alt-speed-enabled" label={t('settings.altSpeedLimits')} valuePropName="checked">
             <Switch size="small" />
           </Form.Item>
 
-          <Form.Item name="alt-speed-down" label="Download (KB/s)">
+          <Form.Item name="alt-speed-down" label={t('settings.altDown')}>
             <InputNumber size="small" min={0} />
           </Form.Item>
-          <Form.Item name="alt-speed-up" label="Upload (KB/s)">
+          <Form.Item name="alt-speed-up" label={t('settings.altUp')}>
             <InputNumber size="small" min={0} />
           </Form.Item>
 
           <Divider className="settings-dialog-divider" />
 
-          <Form.Item name="alt-speed-time-enabled" label="Schedule" valuePropName="checked">
+          <Form.Item name="alt-speed-time-enabled" label={t('settings.schedule')} valuePropName="checked">
             <Switch size="small" />
           </Form.Item>
 
-          <Form.Item label="Time Range">
+          <Form.Item label={t('settings.timeRange')}>
             <Space>
               <Form.Item name="alt-speed-time-begin" noStyle>
                 <InputNumber size="small" min={0} max={1439} className="settings-dialog-input-70"
-                  disabled={!form.getFieldValue('alt-speed-time-enabled')} />
+                  disabled={!altSpeedTimeEnabled} />
               </Form.Item>
               <Text>—</Text>
               <Form.Item name="alt-speed-time-end" noStyle>
                 <InputNumber size="small" min={0} max={1439} className="settings-dialog-input-70"
-                  disabled={!form.getFieldValue('alt-speed-time-enabled')} />
+                  disabled={!altSpeedTimeEnabled} />
               </Form.Item>
-              <Text type="secondary" className="settings-dialog-hint">(minutes from midnight)</Text>
+              <Text type="secondary" className="settings-dialog-hint">{t('settings.minutesFromMidnight')}</Text>
             </Space>
           </Form.Item>
 
-          <Form.Item label="Days">
+          <Form.Item label={t('settings.days')}>
             <Space wrap>
               {weekdays.map((day, i) => (
                 <Button key={i} size="small"
                   type={(altSpeedTimeDay & (1 << i)) ? 'primary' : 'default'}
-                  disabled={!form.getFieldValue('alt-speed-time-enabled')}
+                  disabled={!altSpeedTimeEnabled}
                   onClick={async () => {
                     const newDay = altSpeedTimeDay ^ (1 << i);
                     try {
                       await rpcExec({ method: 'session-set', arguments: { 'alt-speed-time-day': newDay } });
-                      message.success(`Saved: ${day}`);
-                    } catch { message.error('Failed'); }
+                      message.success(t('settings.savedDay', { day }));
+                    } catch { message.error(t('settings.failed')); }
                   }}
                   className="settings-dialog-day-btn">{day}</Button>
               ))}
@@ -360,11 +383,11 @@ export default function SettingsDialog({ open, onClose }: Props) {
     },
     {
       key: 'folders',
-      label: 'Folders Dictionary',
+      label: t('settings.tabs.folders'),
       children: (
         <div className="settings-dialog-pane" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Text type="secondary" className="settings-dialog-hint">
-            One data folder path per line. Used to auto-match torrents to their data folders.
+            {t('settings.foldersHint')}
           </Text>
           <Input.TextArea
             rows={10}
@@ -378,27 +401,30 @@ export default function SettingsDialog({ open, onClose }: Props) {
     },
     {
       key: 'more',
-      label: 'More',
+      label: t('settings.tabs.more'),
       children: (
         <div className="settings-dialog-pane">
-          <Form.Item label="Show Servers in Sidebar">
+          <Form.Item label={t('settings.showServers')}>
             <Switch size="small" checked={localConfig.showTrackerFilter}
               onChange={(v) => useConfigStore.setState({ showTrackerFilter: v })} />
           </Form.Item>
-          <Form.Item label="Show Free Space">
+          <Form.Item label={t('settings.showFreeSpace')}>
             <Switch size="small" checked={localConfig.showFreeSpace}
               onChange={(v) => useConfigStore.setState({ showFreeSpace: v })} />
           </Form.Item>
-          <Form.Item label="Allow Edit Path">
+          <Form.Item label={t('settings.allowEditPath')}>
             <Switch size="small" checked={localConfig.allowEditPath}
               onChange={(v) => useConfigStore.setState({ allowEditPath: v })} />
           </Form.Item>
 
           <Divider className="settings-dialog-divider" />
 
-          <Form.Item label="Language">
+          <Form.Item label={t('settings.language')}>
             <Select size="small" value={localConfig.language} className="settings-dialog-input-140"
-              onChange={(v) => useConfigStore.setState({ language: v })}
+              onChange={(v) => {
+                useConfigStore.setState({ language: v });
+                void i18n.changeLanguage(v);
+              }}
               options={[
                 { value: 'zh_CN', label: '简体中文' },
                 { value: 'en', label: 'English' },
@@ -407,16 +433,16 @@ export default function SettingsDialog({ open, onClose }: Props) {
 
           <Divider className="settings-dialog-divider" />
 
-          <Form.Item label="Auto Refresh Interval (s)">
+          <Form.Item label={t('settings.autoRefreshInterval')}>
             <InputNumber size="small" value={localConfig.autoReloadInterval}
               onChange={(v) => useConfigStore.setState({ autoReloadInterval: v ?? 5 })}
               min={1} max={300} />
           </Form.Item>
-          <Form.Item label="Delete Local Data by Default">
+          <Form.Item label={t('settings.deleteDataDefault')}>
             <Switch size="small" checked={localConfig.deleteLocalDataByDefault}
               onChange={(v) => useConfigStore.setState({ deleteLocalDataByDefault: v })} />
           </Form.Item>
-          <Form.Item label="RPC Path">
+          <Form.Item label={t('settings.rpcPath')}>
             <Select size="small" value={localConfig.rpcPath} className="settings-dialog-input-200"
               onChange={(v) => useConfigStore.setState({ rpcPath: v })}
               options={[{ value: '../rpc', label: '../rpc (default)' }]} />
@@ -426,14 +452,14 @@ export default function SettingsDialog({ open, onClose }: Props) {
     },
     {
       key: 'labels',
-      label: 'User Labels',
+      label: t('settings.tabs.labels'),
       children: <UserLabelsTab />,
     },
   ];
 
   return (
     <Modal
-      title="Transmission Preferences"
+      title={t('settings.title')}
       open={open}
       onCancel={onClose}
       width={680}
@@ -443,15 +469,17 @@ export default function SettingsDialog({ open, onClose }: Props) {
         <div className="settings-dialog-footer">
           <Space size="small">
             <Button size="small" onClick={() => {
-              if (confirm('Reset all settings to defaults?')) {
+              if (confirm(t('settings.restoreConfirm'))) {
                 resetConfig();
                 onClose();
               }
-            }}>Restore Defaults</Button>
+            }}>{t('settings.restoreDefaults')}</Button>
             <Button size="small" onClick={() => {
+              const { rpcPassword: _omit, ...restConfig } = useConfigStore.getState();
               const json = JSON.stringify({
                 configVersion: 1,
-                system: useConfigStore.getState(),
+                // never export the RPC password
+                system: { ...restConfig, rpcPassword: '' },
                 server: sessionConfig ?? {},
               }, null, 2);
               const blob = new Blob([json], { type: 'application/json' });
@@ -459,20 +487,20 @@ export default function SettingsDialog({ open, onClose }: Props) {
               const a = document.createElement('a');
               a.href = url; a.download = 'tr-web-control-config.json';
               a.click(); URL.revokeObjectURL(url);
-            }}>Export</Button>
-            <Button size="small" onClick={() => setImportOpen(true)}>Import</Button>
+            }}>{t('settings.export')}</Button>
+            <Button size="small" onClick={() => setImportOpen(true)}>{t('settings.import')}</Button>
           </Space>
           <Space size="small">
-            <Button size="small" onClick={onClose}>Cancel</Button>
-            <Button type="primary" size="small" loading={saving} onClick={handleSave}>Save</Button>
+            <Button size="small" onClick={onClose}>{t('settings.cancel')}</Button>
+            <Button type="primary" size="small" loading={saving} onClick={handleSave}>{t('settings.save')}</Button>
           </Space>
         </div>
       }
-      destroyOnClose
+      destroyOnHidden
     >
       {isLoading ? (
         <div className="settings-dialog-loading">
-          <Text type="secondary">Loading session configuration…</Text>
+          <Text type="secondary">{t('settings.loading')}</Text>
         </div>
       ) : (
         <Form form={form} layout="horizontal" labelCol={{ span: 8 }} wrapperCol={{ span: 16 }}

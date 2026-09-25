@@ -1,12 +1,14 @@
-import { Component } from 'react';
+import { Component, useEffect } from 'react';
 import { HashRouter, useRoutes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConfigProvider, App as AntApp, Typography } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
+import enUS from 'antd/locale/en_US';
+import { useTranslation } from 'react-i18next';
 import { routes } from './routes.tsx';
 import { ThemeProvider, useAppTheme } from './ThemeContext';
+import { useConfigStore } from '@/core/config/config-store';
 import DropZone from '@/components/DropZone';
-import '../core/i18n';
 
 const { Paragraph } = Typography;
 
@@ -50,8 +52,19 @@ function AppRoutes() {
 /** Inner app that reads theme from context and renders ConfigProvider */
 function ThemedApp() {
   const { themeConfig } = useAppTheme();
+  const { i18n: boundI18n } = useTranslation(); // subscribes to languageChanged
+  const language = useConfigStore((s) => s.language);
+
+  // Persisted language choice drives i18next (the detector is only the
+  // initial default; the store is the source of truth).
+  useEffect(() => {
+    if (language && boundI18n.language !== language) {
+      void boundI18n.changeLanguage(language);
+    }
+  }, [language, boundI18n]);
+
   return (
-    <ConfigProvider theme={themeConfig} locale={zhCN}>
+    <ConfigProvider theme={themeConfig} locale={boundI18n.language === 'en' ? enUS : zhCN}>
       <AntApp>
         <HashRouter>
           <DropZone />

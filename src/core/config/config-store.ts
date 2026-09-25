@@ -69,6 +69,14 @@ const defaultConfig: AppConfig = {
 export const useConfigStore = create<AppConfig>()(
   persist(() => defaultConfig, {
     name: 'tr-web-control-config',
+    // Never persist the RPC password to localStorage — it's readable by any
+    // script on the origin and survives on shared machines. Credentials are
+    // runtime-only (there is currently no UI to set them anyway).
+    partialize: (state) => {
+      const { rpcPassword, ...rest } = state;
+      void rpcPassword;
+      return rest as AppConfig;
+    },
   }),
 );
 

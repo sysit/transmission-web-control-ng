@@ -51,7 +51,7 @@ export default function StatusBar({ stats, sessionConfig, freeSpaceBytes, collec
       {uptime && (
         <>
           <span className="stat-sep">|</span>
-          <span>Up: <strong>{uptime}</strong></span>
+          <span>{t('status.up')}: <strong>{uptime}</strong></span>
         </>
       )}
       <span className="stat-sep">|</span>

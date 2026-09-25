@@ -6,6 +6,7 @@
 
 import { useState } from 'react';
 import { Modal, Checkbox, App } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { exec as rpcExec } from '@/core/rpc/transmission-client';
 import { useConfigStore } from '@/core/config/config-store';
 import type { AppConfig } from '@/core/config/config-store';
@@ -22,6 +23,7 @@ interface ParsedConfig {
 }
 
 export default function ImportConfigDialog({ open, onClose }: Props) {
+  const { t } = useTranslation();
   const { message } = App.useApp();
   const [parsed, setParsed] = useState<ParsedConfig | null>(null);
   const [fileName, setFileName] = useState('');
@@ -39,13 +41,13 @@ export default function ImportConfigDialog({ open, onClose }: Props) {
       setApplySystem(!!data.system);
       setApplyServer(!!data.server);
     } catch {
-      message.error('Invalid JSON config file');
+      message.error(t('importConfig.invalid'));
       setFileName('');
     }
   };
 
   const handleOk = async () => {
-    if (!parsed) { message.warning('Select a config file first'); return; }
+    if (!parsed) { message.warning(t('importConfig.noFile')); return; }
     setSaving(true);
     try {
       if (applySystem && parsed.system) {
@@ -62,11 +64,11 @@ export default function ImportConfigDialog({ open, onClose }: Props) {
       if (applyServer && parsed.server) {
         await rpcExec({ method: 'session-set', arguments: parsed.server });
       }
-      message.success('Configuration imported');
+      message.success(t('importConfig.done'));
       setParsed(null); setFileName('');
       onClose();
     } catch {
-      message.error('Failed to import configuration');
+      message.error(t('importConfig.failed'));
     } finally {
       setSaving(false);
     }
@@ -75,10 +77,10 @@ export default function ImportConfigDialog({ open, onClose }: Props) {
   const hasAny = !!(parsed?.system || parsed?.server);
 
   return (
-    <Modal title="Import Configuration" open={open} onOk={handleOk} onCancel={() => {
+    <Modal title={t('importConfig.title')} open={open} onOk={handleOk} onCancel={() => {
       setParsed(null); setFileName('');
       onClose();
-    }} confirmLoading={saving} destroyOnClose okText="Import" cancelText="Cancel"
+    }} confirmLoading={saving} destroyOnHidden okText={t('importConfig.ok')} cancelText={t('importConfig.cancel')}
       width={480}>
       <div style={{ marginBottom: 12 }}>
         <label style={{ cursor: 'pointer' }}>
@@ -88,7 +90,7 @@ export default function ImportConfigDialog({ open, onClose }: Props) {
               if (f) handleFile(f);
               e.target.value = '';
             }} />
-          <span style={{ fontSize: 12, color: 'var(--eui-accent)' }}>Choose config file…</span>
+          <span style={{ fontSize: 12, color: 'var(--eui-accent)' }}>{t('importConfig.choose')}</span>
         </label>
         {fileName && <span style={{ fontSize: 12, color: '#666', marginLeft: 8 }}>{fileName}</span>}
       </div>
@@ -97,25 +99,25 @@ export default function ImportConfigDialog({ open, onClose }: Props) {
         <>
           {parsed.configVersion != null && (
             <div style={{ fontSize: 12, color: '#999', marginBottom: 8 }}>
-              Config version: {parsed.configVersion}
+              {t('importConfig.version', { version: parsed.configVersion })}
             </div>
           )}
           {hasAny ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {parsed.system && (
                 <Checkbox checked={applySystem} onChange={(e) => setApplySystem(e.target.checked)}>
-                  App configuration (labels, folders dictionary, display options)
+                  {t('importConfig.applySystem')}
                 </Checkbox>
               )}
               {parsed.server && (
                 <Checkbox checked={applyServer} onChange={(e) => setApplyServer(e.target.checked)}>
-                  Transmission daemon settings
+                  {t('importConfig.applyServer')}
                 </Checkbox>
               )}
             </div>
           ) : (
             <div style={{ fontSize: 12, color: '#999' }}>
-              This file does not contain any recognized config sections.
+              {t('importConfig.noSections')}
             </div>
           )}
         </>

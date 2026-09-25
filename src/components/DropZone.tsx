@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { message } from 'antd';
+import { App } from 'antd';
 import LegacyIcon from '@/components/LegacyIcon';
 import { useAddTorrentFile } from '@/hooks/useTorrents';
 import { readTorrentFile } from '@/core/rpc/transmission-client';
@@ -9,6 +9,7 @@ import { readTorrentFile } from '@/core/rpc/transmission-client';
  * Shows when user drags files over the page, matching the old #dropArea behavior.
  */
 export default function DropZone() {
+  const { message } = App.useApp();
   const [hovering, setHovering] = useState(false);
   const counter = useRef(0);
   const addTorrent = useAddTorrentFile();
@@ -82,7 +83,7 @@ export default function DropZone() {
         }
       }, 300);
     });
-  }, [addTorrent]);
+  }, [addTorrent, message]);
 
   useEffect(() => {
     document.body.addEventListener('dragenter', handleDragEnter);
@@ -96,6 +97,20 @@ export default function DropZone() {
       document.body.removeEventListener('drop', handleDrop);
     };
   }, [handleDragEnter, handleDragLeave, handleDragOver, handleDrop]);
+
+  // Esc cancels the overlay (the overlay itself is pointerEvents:none,
+  // so a keydown listener is the only way out short of dropping).
+  useEffect(() => {
+    if (!hovering) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        counter.current = 0;
+        setHovering(false);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [hovering]);
 
   if (!hovering) return null;
 

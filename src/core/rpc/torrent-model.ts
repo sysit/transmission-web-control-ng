@@ -117,16 +117,20 @@ export function addTrackerInfo(
       if (!trackerNames.includes(name)) trackerNames.push(name);
     }
 
+    // Always re-derive (never carry stale values forward via the merge):
+    // warning only when EVERY tracker is failing/waiting, cleared otherwise.
     if (warnings.length === trackerStats.length) {
       const joined = warnings.join(';').replace(/;/g, '');
       item.warning = joined === '' ? '' : warnings.join(';');
-      if (
-        !item.nextAnnounceTime ||
-        item.nextAnnounceTime > trackerStats[0].nextAnnounceTime
-      ) {
-        item.nextAnnounceTime = trackerStats[0].nextAnnounceTime;
-      }
+    } else {
+      item.warning = '';
     }
+    item.nextAnnounceTime = trackerStats.length
+      ? trackerStats.reduce(
+          (min, s) => Math.min(min, s.nextAnnounceTime),
+          trackerStats[0].nextAnnounceTime,
+        )
+      : undefined;
 
     if (item.leecherCount < 0) item.leecherCount = 0;
     if (item.seederCount < 0) item.seederCount = 0;

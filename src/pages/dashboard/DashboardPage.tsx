@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Button, Select, Space, Tooltip, Dropdown, Input, Pagination } from 'antd';
+import { Button, Select, Space, Tooltip, Dropdown, Input, Pagination, App } from 'antd';
 import type { MenuProps } from 'antd';
+import { useTranslation } from 'react-i18next';
 import LegacyIcon from '@/components/LegacyIcon';
 import {
   useTorrents, useSessionStats, useSessionConfig, useFreeSpace,
@@ -11,6 +12,7 @@ import { TorrentStatus } from '@/core/rpc/rpc-types';
 import SidebarTree from './SidebarTree';
 import SidebarSelectedPanel from './SidebarSelectedPanel';
 import TorrentTable from './TorrentTable';
+import type { SortState } from './TorrentTable';
 import StatusBar from './StatusBar';
 import TorrentDetailPanel from './TorrentDetailPanel';
 import TorrentContextMenu from '@/components/TorrentContextMenu';
@@ -25,8 +27,10 @@ import RenameDialog from './dialogs/RenameDialog';
 import ChangeDownloadDirDialog from './dialogs/ChangeDownloadDirDialog';
 import SetLabelsDialog from './dialogs/SetLabelsDialog';
 import SpeedLimitDialog from './dialogs/SpeedLimitDialog';
+import type { SpeedLimitInitial } from './dialogs/SpeedLimitDialog';
 import RemoveTorrentDialog from './dialogs/RemoveTorrentDialog';
 import ReplaceTrackerDialog from './dialogs/ReplaceTrackerDialog';
+import AutoMatchDialog from './dialogs/AutoMatchDialog';
 
 const REFRESH_OPTIONS = [
   { value: 5, label: '5s' },
@@ -38,7 +42,14 @@ const REFRESH_OPTIONS = [
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50, 100, 150, 200, 250, 300, 5000];
 
+// Column key → torrent field for global sorting (column keys that differ
+// from the underlying data field)
+const SORT_FIELD_ALIAS: Record<string, string> = {
+  eta: 'remainingTime', statusCol: 'status', idCol: 'id',
+};
+
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const [selectedKey, setSelectedKey] = useState('all');
   const [selectedTrackerId, setSelectedTrackerId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -49,7 +60,9 @@ export default function DashboardPage() {
   const [autoRefresh, setAutoRefresh] = useState(() => useConfigStore.getState().autoReload);
   const [refreshInterval, setRefreshInterval] = useState(() => useConfigStore.getState().autoReloadInterval);
   const { themeName, setThemeName } = useAppTheme();
-  const [altSpeedEnabled, setAltSpeedEnabled] = useState(false);
+  // Alt-speed state syncs from the session poll (old UI read it on load too);
+  // null until the first session-get resolves.
+  const [altSpeedEnabled, setAltSpeedEnabled] = useState<boolean | null>(null);
   const [contextMenuVisible, setContextMenuVisible] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
   const [contextMenuTorrent, setContextMenuTorrent] = useState<Torrent | null>(null);
@@ -73,8 +86,14 @@ export default function DashboardPage() {
   // so changing the table selection mid-edit cannot corrupt the dialog.
   const [renameTarget, setRenameTarget] = useState<{ ids: number[]; name: string } | null>(null);
   const [changeDirTarget, setChangeDirTarget] = useState<{ ids: number[]; dir: string } | null>(null);
-  const [speedLimitTarget, setSpeedLimitTarget] = useState<{ ids: number[] } | null>(null);
+  // Snapshot prefills at open time — the torrent object identity churns every
+  // 5s poll, so dialogs must never seed themselves from live props.
+  const [speedLimitTarget, setSpeedLimitTarget] = useState<{
+    ids: number[];
+    initial: SpeedLimitInitial;
+  } | null>(null);
   const [replaceTrackerTarget, setReplaceTrackerTarget] = useState<{ ids: number[] } | null>(null);
+  const [autoMatchTarget, setAutoMatchTarget] = useState<{ ids: number[] } | null>(null);
   const [setLabelsTarget, setSetLabelsTarget] = useState<{ ids: number[]; labels: string[] } | null>(null);
   const [removeTarget, setRemoveTarget] = useState<{ ids: number[]; deleteData: boolean } | null>(null);
 
@@ -87,10 +106,16 @@ export default function DashboardPage() {
     interval: refreshInterval,
     autoRefresh,
   });
-  const { data: sessionStats } = useSessionStats();
+  const { data: sessionStats } = useSessionStats({ interval: refreshInterval, autoRefresh });
   const { data: sessionConfig } = useSessionConfig();
   const startTorrentAction = useStartTorrent();
   const stopTorrentAction = useStopTorrent();
+
+  // Keep the toolbar alt-speed button in sync with the real session state
+  const rpcAltSpeed = sessionConfig?.['alt-speed-enabled'];
+  useEffect(() => {
+    if (typeof rpcAltSpeed === 'boolean') setAltSpeedEnabled(rpcAltSpeed);
+  }, [rpcAltSpeed]);
 
   const collection = torrentData?.collection;
   const downloadDir = sessionConfig?.['download-dir'];
@@ -99,25 +124,35 @@ export default function DashboardPage() {
   const filteredTorrents = useMemo(() => {
     if (!collection) return [];
     let list: Torrent[];
-    switch (selectedKey) {
-      case 'downloading':
-        list = collection.status[TorrentStatus.DOWNLOAD] ?? []; break;
-      case 'sending':
-        list = collection.status[TorrentStatus.SEED] ?? []; break;
-      case 'paused':
-        list = collection.status[TorrentStatus.STOPPED] ?? []; break;
-      case 'check':
-        list = [...(collection.status[TorrentStatus.CHECK] ?? []),
-               ...(collection.status[TorrentStatus.CHECK_WAIT] ?? [])]; break;
-      case 'actively': list = collection.actively; break;
-      case 'error': list = collection.error; break;
-      case 'warning': list = collection.warning; break;
-      default:
-        if (selectedTrackerId && torrentData?.trackers[selectedTrackerId]) {
-          list = torrentData.trackers[selectedTrackerId].torrents;
-        } else {
-          list = Object.values(collection.all);
-        }
+    if (selectedKey.startsWith('folders-')) {
+      // Sidebar folder node — model precomputes the torrent list per dirPath
+      const folder = collection.folders[selectedKey];
+      list = folder ? folder.torrents : [];
+    } else if (selectedKey.startsWith('label-')) {
+      // Sidebar user-label node — RPC `labels` field holds label names
+      const labelName = selectedKey.slice('label-'.length);
+      list = Object.values(collection.all).filter((tor) => tor.labels?.includes(labelName));
+    } else {
+      switch (selectedKey) {
+        case 'downloading':
+          list = collection.status[TorrentStatus.DOWNLOAD] ?? []; break;
+        case 'sending':
+          list = collection.status[TorrentStatus.SEED] ?? []; break;
+        case 'paused':
+          list = collection.status[TorrentStatus.STOPPED] ?? []; break;
+        case 'check':
+          list = [...(collection.status[TorrentStatus.CHECK] ?? []),
+                 ...(collection.status[TorrentStatus.CHECK_WAIT] ?? [])]; break;
+        case 'actively': list = collection.actively; break;
+        case 'error': list = collection.error; break;
+        case 'warning': list = collection.warning; break;
+        default:
+          if (selectedTrackerId && torrentData?.trackers[selectedTrackerId]) {
+            list = torrentData.trackers[selectedTrackerId].torrents;
+          } else {
+            list = Object.values(collection.all);
+          }
+      }
     }
     if (searchText) {
       const kw = searchText.toLowerCase();
@@ -135,17 +170,47 @@ export default function DashboardPage() {
     }
   }, [selectedKey, selectedTrackerId]);
 
+  // Global sort — applied to the FULL filtered list before pagination
+  // (sorting only the visible page made the sort look broken past page 1).
+  const [sortState, setSortState] = useState<SortState | null>(null);
+  const sortedTorrents = useMemo(() => {
+    if (!sortState) return filteredTorrents;
+    const field = SORT_FIELD_ALIAS[sortState.key] ?? sortState.key;
+    const dir = sortState.order === 'ascend' ? 1 : -1;
+    return [...filteredTorrents].sort((a, b) => {
+      const av = (a as unknown as Record<string, unknown>)[field];
+      const bv = (b as unknown as Record<string, unknown>)[field];
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+      return String(av ?? '').localeCompare(String(bv ?? '')) * dir;
+    });
+  }, [filteredTorrents, sortState]);
+
   const totalCount = filteredTorrents.length;
+  // Clamp to the last valid page — filtering (search) or external removals
+  // can shrink the list below the current page, which would show an empty table.
+  const maxPage = Math.max(1, Math.ceil(totalCount / pageSize));
+  const safePage = Math.min(currentPage, maxPage);
   const pagedTorrents = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredTorrents.slice(start, start + pageSize);
-  }, [filteredTorrents, currentPage, pageSize]);
+    const start = (safePage - 1) * pageSize;
+    return sortedTorrents.slice(start, start + pageSize);
+  }, [sortedTorrents, safePage, pageSize]);
 
   const selectedTorrent = selectedTorrentId > 0
     ? collection?.all[selectedTorrentId] : undefined;
 
   const firstSelected = selectedIds.length > 0 && collection
     ? collection.all[selectedIds[0]] : undefined;
+
+  const { message } = App.useApp();
+
+  // Drop selected ids that no longer exist (removed here or from another client)
+  useEffect(() => {
+    if (!collection) return;
+    setSelectedIds((prev) => {
+      const next = prev.filter((id) => collection.all[id]);
+      return next.length === prev.length ? prev : next;
+    });
+  }, [collection]);
 
   const handleTreeSelect = useCallback((key: string, trackerId?: string) => {
     setSelectedKey(key);
@@ -170,16 +235,24 @@ export default function DashboardPage() {
   }, []);
 
   const handleStart = useCallback(() => {
-    if (selectedIds.length > 0) startTorrentAction.mutate(selectedIds);
-  }, [selectedIds, startTorrentAction]);
+    if (selectedIds.length > 0) {
+      startTorrentAction.mutate(selectedIds, {
+        onError: (e) => message.error(e instanceof Error ? e.message : String(e)),
+      });
+    }
+  }, [selectedIds, startTorrentAction, message]);
 
   const handlePause = useCallback(() => {
-    if (selectedIds.length > 0) stopTorrentAction.mutate(selectedIds);
-  }, [selectedIds, stopTorrentAction]);
+    if (selectedIds.length > 0) {
+      stopTorrentAction.mutate(selectedIds, {
+        onError: (e) => message.error(e instanceof Error ? e.message : String(e)),
+      });
+    }
+  }, [selectedIds, stopTorrentAction, message]);
 
   const handleDelete = useCallback(() => {
     if (selectedIds.length > 0) {
-      setRemoveTarget({ ids: selectedIds, deleteData: false });
+      setRemoveTarget({ ids: selectedIds, deleteData: useConfigStore.getState().deleteLocalDataByDefault });
     }
   }, [selectedIds]);
 
@@ -200,25 +273,43 @@ export default function DashboardPage() {
 
   const handleVerify = useCallback(() => {
     if (selectedIds.length > 0) {
-      rpcExec({ method: 'torrent-verify', arguments: { ids: selectedIds } }).catch(() => {});
+      rpcExec({ method: 'torrent-verify', arguments: { ids: selectedIds } })
+        .catch((e) => message.error(e instanceof Error ? e.message : String(e)));
     }
-  }, [selectedIds]);
+  }, [selectedIds, message]);
 
   const handleMorePeers = useCallback(() => {
     if (selectedIds.length > 0) {
-      rpcExec({ method: 'torrent-reannounce', arguments: { ids: selectedIds } }).catch(() => {});
+      rpcExec({ method: 'torrent-reannounce', arguments: { ids: selectedIds } })
+        .catch((e) => message.error(e instanceof Error ? e.message : String(e)));
     }
-  }, [selectedIds]);
+  }, [selectedIds, message]);
 
   const handleChangeDir = useCallback(() => {
     if (!firstSelected) return;
     setChangeDirTarget({ ids: [firstSelected.id], dir: firstSelected.downloadDir ?? '' });
   }, [firstSelected]);
 
+  // Snapshot prefills at open time — the torrent object identity churns every
+  // 5s poll, so dialogs must never seed themselves from live props.
+  const openSpeedLimit = useCallback((ids: number[]) => {
+    const src = collection?.all[ids[0]];
+    setSpeedLimitTarget({
+      ids,
+      initial: {
+        downloadLimited: !!src?.downloadLimited,
+        downloadLimit: src?.downloadLimit ?? null,
+        uploadLimited: !!src?.uploadLimited,
+        uploadLimit: src?.uploadLimit ?? null,
+        peerLimit: src?.['peer-limit'] ?? null,
+      },
+    });
+  }, [collection]);
+
   const handleSpeedLimit = useCallback(() => {
-    if (selectedIds.length === 0) return;
-    setSpeedLimitTarget({ ids: selectedIds });
-  }, [selectedIds]);
+    if (selectedIds.length === 0 || !firstSelected) return;
+    openSpeedLimit(selectedIds);
+  }, [selectedIds, firstSelected, openSpeedLimit]);
 
   const handleCopyPath = useCallback(async () => {
     if (!firstSelected) return;
@@ -230,70 +321,42 @@ export default function DashboardPage() {
   const handleQueueMove = useCallback((direction: 'top' | 'up' | 'down' | 'bottom') => {
     if (selectedIds.length === 0) return;
     const method = `queue-move-${direction}`;
-    rpcExec({ method, arguments: { ids: selectedIds } }).catch(() => {});
-  }, [selectedIds]);
+    rpcExec({ method, arguments: { ids: selectedIds } })
+      .catch((e) => message.error(e instanceof Error ? e.message : String(e)));
+  }, [selectedIds, message]);
 
   const handleAltSpeedToggle = useCallback(() => {
-    const newVal = !altSpeedEnabled;
+    const newVal = !(altSpeedEnabled ?? false);
     setAltSpeedEnabled(newVal);
-    rpcExec({ method: 'session-set', arguments: { 'alt-speed-enabled': newVal } }).catch(() => {});
-  }, [altSpeedEnabled]);
+    rpcExec({ method: 'session-set', arguments: { 'alt-speed-enabled': newVal } })
+      .catch((e) => {
+        setAltSpeedEnabled(!newVal); // revert on failure
+        message.error(e instanceof Error ? e.message : String(e));
+      });
+  }, [altSpeedEnabled, message]);
 
   const queueItems: MenuProps['items'] = [
-    { key: 'top', label: 'Move to Top', onClick: () => handleQueueMove('top') },
-    { key: 'up', label: 'Move Up', onClick: () => handleQueueMove('up') },
-    { key: 'down', label: 'Move Down', onClick: () => handleQueueMove('down') },
-    { key: 'bottom', label: 'Move to Bottom', onClick: () => handleQueueMove('bottom') },
+    { key: 'top', label: t('toolbar.moveToTop'), onClick: () => handleQueueMove('top') },
+    { key: 'up', label: t('toolbar.moveUp'), onClick: () => handleQueueMove('up') },
+    { key: 'down', label: t('toolbar.moveDown'), onClick: () => handleQueueMove('down') },
+    { key: 'bottom', label: t('toolbar.moveToBottom'), onClick: () => handleQueueMove('bottom') },
   ];
 
   const pluginItems: MenuProps['items'] = [
     {
-      key: 'replaceTracker', label: 'Replace Tracker',
+      key: 'replaceTracker', label: t('toolbar.replaceTracker'),
       onClick: () => {
         if (selectedIds.length === 0) return;
         setReplaceTrackerTarget({ ids: selectedIds });
       },
     },
     {
-      key: 'autoMatchDir', label: 'Auto Match Directory',
+      key: 'autoMatchDir', label: t('toolbar.autoMatchDir'),
       onClick: () => {
-        if (selectedIds.length === 0) {
-          const allIds = Object.keys(collection?.all ?? {}).map(Number);
-          if (allIds.length === 0) return;
-          const pattern = prompt('Match pattern (e.g. "Movie" or regex):');
-          if (!pattern) return;
-          const targetDir = prompt('Target download directory:');
-          if (!targetDir) return;
-          try {
-            const regex = new RegExp(pattern, 'i');
-            const matched = allIds.filter((id) => {
-              const t = collection?.all[id];
-              return t && regex.test(t.name);
-            });
-            if (matched.length === 0) { alert('No torrents matched the pattern.'); return; }
-            if (!confirm(`Move ${matched.length} torrent(s) to:\n${targetDir}?`)) return;
-            matched.forEach((id) => {
-              rpcExec({ method: 'torrent-set-location', arguments: { ids: [id], location: targetDir, move: true } }).catch(() => {});
-            });
-          } catch { alert('Invalid regex pattern'); }
-        } else {
-          const pattern = prompt('Match pattern for selected torrents (regex):');
-          if (!pattern) return;
-          const targetDir = prompt('Target download directory:');
-          if (!targetDir) return;
-          try {
-            const regex = new RegExp(pattern, 'i');
-            const matched = selectedIds.filter((id) => {
-              const t = collection?.all[id];
-              return t && regex.test(t.name);
-            });
-            if (matched.length === 0) { alert('No selected torrents matched the pattern.'); return; }
-            if (!confirm(`Move ${matched.length} torrent(s) to:\n${targetDir}?`)) return;
-            matched.forEach((id) => {
-              rpcExec({ method: 'torrent-set-location', arguments: { ids: [id], location: targetDir, move: true } }).catch(() => {});
-            });
-          } catch { alert('Invalid regex pattern'); }
-        }
+        // Old plugin.js: requires checked rows; dialog itself filters to
+        // stopped + 0% candidates against the folder dictionary.
+        if (selectedIds.length === 0) return;
+        setAutoMatchTarget({ ids: selectedIds });
       },
     },
   ];
@@ -320,7 +383,7 @@ export default function DashboardPage() {
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
           />
           <Space size="small">
-            <span style={{ fontSize: 11, color: 'var(--eui-item-text)' }}>Theme:</span>
+            <span style={{ fontSize: 11, color: 'var(--eui-item-text)' }}>{t('toolbar.theme')}</span>
             <Select size="small" value={themeName} style={{ width: 90 }}
               onChange={setThemeName}
               options={[
@@ -331,7 +394,7 @@ export default function DashboardPage() {
                 { value: 'black', label: 'Black' },
               ]}
             />
-            <Tooltip title="About">
+            <Tooltip title={t('toolbar.about')}>
               <Button size="small" type="text" style={{ fontSize: 12 }}
                 onClick={() => setAboutOpen(true)}>
                 <LegacyIcon name="about" size={16} />
@@ -342,12 +405,12 @@ export default function DashboardPage() {
 
         {/* Toolbar — 28px compact */}
         <div className="dashboard-toolbar">
-          <Tooltip title="Add Torrent">
+          <Tooltip title={t('toolbar.addTorrent')}>
             <Button size="small" icon={<LegacyIcon name="add-torrent" size={16} />} type="text"
               onClick={() => setAddTorrentOpen(true)} />
           </Tooltip>
           <div className="toolbar-divider" />
-          <Tooltip title={altSpeedEnabled ? 'Disable Alt Speed' : 'Enable Alt Speed'}>
+          <Tooltip title={altSpeedEnabled ? t('toolbar.altSpeedOn') : t('toolbar.altSpeedOff')}>
             <Button size="small"
               icon={<LegacyIcon name={altSpeedEnabled ? 'alt-speed-on' : 'alt-speed-off'} size={16} />}
               type="text"
@@ -355,69 +418,69 @@ export default function DashboardPage() {
               onClick={handleAltSpeedToggle} />
           </Tooltip>
           <div className="toolbar-divider" />
-          <Tooltip title="Refresh">
+          <Tooltip title={t('toolbar.refresh')}>
             <Button size="small" icon={<LegacyIcon name="refresh" size={16} />} type="text"
               onClick={() => refetch()} />
           </Tooltip>
-          <Tooltip title="Settings">
+          <Tooltip title={t('toolbar.settings')}>
             <Button size="small" icon={<LegacyIcon name="settings" size={16} />} type="text"
               onClick={() => setSettingsOpen(true)} />
           </Tooltip>
           <Dropdown menu={{ items: pluginItems }}>
-            <Tooltip title="Plugins">
-              <Button size="small" icon={<LegacyIcon name="plugins" size={16} />} type="text">Plugins</Button>
+            <Tooltip title={t('toolbar.plugins')}>
+              <Button size="small" icon={<LegacyIcon name="plugins" size={16} />} type="text">{t('toolbar.plugins')}</Button>
             </Tooltip>
           </Dropdown>
           <div className="toolbar-divider" />
 
-          <Tooltip title="Start">
+          <Tooltip title={t('toolbar.start')}>
             <Button size="small" icon={<LegacyIcon name="start" size={16} />} type="text"
               disabled={selectedIds.length === 0} onClick={handleStart} />
           </Tooltip>
-          <Tooltip title="Pause">
+          <Tooltip title={t('toolbar.pause')}>
             <Button size="small" icon={<LegacyIcon name="pause" size={16} />} type="text"
               disabled={selectedIds.length === 0} onClick={handlePause} />
           </Tooltip>
-          <Tooltip title="Rename">
+          <Tooltip title={t('toolbar.rename')}>
             <Button size="small" icon={<LegacyIcon name="rename" size={16} />} type="text"
               disabled={selectedIds.length !== 1} onClick={handleRename} />
           </Tooltip>
-          <Tooltip title="Remove">
+          <Tooltip title={t('toolbar.remove')}>
             <Button size="small" icon={<LegacyIcon name="remove" size={16} />} type="text"
               disabled={selectedIds.length === 0} onClick={handleDelete} />
           </Tooltip>
-          <Tooltip title="Verify">
+          <Tooltip title={t('toolbar.verify')}>
             <Button size="small" icon={<LegacyIcon name="verify" size={16} />} type="text"
               disabled={selectedIds.length === 0} onClick={handleVerify} />
           </Tooltip>
-          <Tooltip title="More Peers">
+          <Tooltip title={t('toolbar.morePeers')}>
             <Button size="small" icon={<LegacyIcon name="more-peers" size={16} />} type="text"
               disabled={selectedIds.length === 0} onClick={handleMorePeers} />
           </Tooltip>
-          <Tooltip title="Change Directory">
+          <Tooltip title={t('toolbar.changeDir')}>
             <Button size="small" icon={<LegacyIcon name="change-dir" size={16} />} type="text"
               disabled={selectedIds.length !== 1} onClick={handleChangeDir} />
           </Tooltip>
-          <Tooltip title="Speed Limit">
+          <Tooltip title={t('toolbar.speedLimit')}>
             <Button size="small" icon={<LegacyIcon name="speed-limit" size={16} />} type="text"
               disabled={selectedIds.length === 0} onClick={handleSpeedLimit} />
           </Tooltip>
-          <Tooltip title="Copy Path">
+          <Tooltip title={t('toolbar.copyPath')}>
             <Button size="small" icon={<LegacyIcon name="copy-path" size={16} />} type="text"
               disabled={selectedIds.length !== 1} onClick={handleCopyPath} />
           </Tooltip>
           <Dropdown menu={{ items: queueItems }}>
-            <Tooltip title="Queue">
-              <Button size="small" icon={<LegacyIcon name="queue-move" size={16} />} type="text">Queue</Button>
+            <Tooltip title={t('toolbar.queue')}>
+              <Button size="small" icon={<LegacyIcon name="queue-move" size={16} />} type="text">{t('toolbar.queue')}</Button>
             </Tooltip>
           </Dropdown>
           <div className="toolbar-divider" />
 
-          <Tooltip title="Start All">
+          <Tooltip title={t('toolbar.startAll')}>
             <Button size="small" icon={<LegacyIcon name="start-all" size={16} />} type="text"
               onClick={handleStartAll}>All</Button>
           </Tooltip>
-          <Tooltip title="Pause All">
+          <Tooltip title={t('toolbar.pauseAll')}>
             <Button size="small" icon={<LegacyIcon name="pause-all" size={16} />} type="text"
               onClick={handlePauseAll}>All</Button>
           </Tooltip>
@@ -431,7 +494,7 @@ export default function DashboardPage() {
             }}
             options={REFRESH_OPTIONS}
           />
-          <Tooltip title={autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}>
+          <Tooltip title={autoRefresh ? t('toolbar.autoReloadOn') : t('toolbar.autoReloadOff')}>
             <Button size="small" type="text"
               icon={<LegacyIcon name="refresh" size={16} />}
               style={{ color: autoRefresh ? '#0E2D5F' : '#999' }}
@@ -444,7 +507,7 @@ export default function DashboardPage() {
           </Tooltip>
           <div className="toolbar-divider" />
 
-          <Input size="small" placeholder="Search…" prefix={<LegacyIcon name="search" size={14} />}
+          <Input size="small" placeholder={t('toolbar.searchPlaceholder')} prefix={<LegacyIcon name="search" size={14} />}
             style={{ width: 180 }} value={searchText}
             onChange={(e) => setSearchText(e.target.value)} allowClear
           />
@@ -457,7 +520,7 @@ export default function DashboardPage() {
         onReplaceTracker={() => { if (selectedIds.length > 0) setReplaceTrackerTarget({ ids: selectedIds }); }}
         onRemove={handleDelete}
         onChangeDir={() => { if (selectedIds.length > 0 && firstSelected) setChangeDirTarget({ ids: selectedIds, dir: firstSelected.downloadDir ?? '' }); }}
-        onSpeedLimit={() => { if (selectedIds.length > 0) setSpeedLimitTarget({ ids: selectedIds }); }}
+        onSpeedLimit={() => { if (selectedIds.length > 0) openSpeedLimit(selectedIds); }}
       />
 
       {/* ════ Body: Sidebar + Content ════ */}
@@ -500,13 +563,15 @@ export default function DashboardPage() {
                 onContextMenu={handleContextMenu}
                 onRowSelect={handleRowSelect}
                 selectedTorrentId={selectedTorrentId}
+                sortState={sortState}
+                onSortChange={setSortState}
               />
             </div>
             {/* Pagination bar */}
             <div className="dashboard-pagination">
               <Pagination
                 size="small"
-                current={currentPage}
+                current={safePage}
                 pageSize={pageSize}
                 total={totalCount}
                 showSizeChanger
@@ -514,6 +579,7 @@ export default function DashboardPage() {
                 onChange={(page, size) => {
                   setCurrentPage(page);
                   setPageSize(size);
+                  if (size !== pageSize) setCurrentPage(1);
                 }}
                 showTotal={(total, range) => `${range[0]}-${range[1]} / ${total}`}
               />
@@ -544,7 +610,7 @@ export default function DashboardPage() {
           ) : (
             <div className="detail-toggle-bar detail-toggle-bar--empty">
               <span className="detail-toggle-text">
-                Select a torrent to view details
+                {t('detail.selectPrompt')}
               </span>
             </div>
           )}
@@ -572,7 +638,7 @@ export default function DashboardPage() {
           onRemove={(ids, deleteData) => setRemoveTarget({ ids, deleteData })}
           onChangeDir={(ids, dir) => setChangeDirTarget({ ids, dir })}
           onSetLabels={(ids, labels) => setSetLabelsTarget({ ids, labels })}
-          onSpeedLimit={(ids) => setSpeedLimitTarget({ ids })}
+          onSpeedLimit={(ids) => openSpeedLimit(ids)}
         />
       )}
 
@@ -593,9 +659,11 @@ export default function DashboardPage() {
       <ChangeDownloadDirDialog open={!!changeDirTarget} torrentIds={changeDirTarget?.ids ?? []}
         currentDir={changeDirTarget?.dir ?? ''} onClose={() => setChangeDirTarget(null)} />
       <SpeedLimitDialog open={!!speedLimitTarget} ids={speedLimitTarget?.ids ?? []}
-        torrent={firstSelected} onClose={() => setSpeedLimitTarget(null)} />
+        initial={speedLimitTarget?.initial} onClose={() => setSpeedLimitTarget(null)} />
       <ReplaceTrackerDialog open={!!replaceTrackerTarget} ids={replaceTrackerTarget?.ids ?? []}
         onClose={() => setReplaceTrackerTarget(null)} />
+      <AutoMatchDialog open={!!autoMatchTarget} ids={autoMatchTarget?.ids ?? []}
+        torrents={collection?.all ?? {}} onClose={() => setAutoMatchTarget(null)} />
       <SetLabelsDialog open={!!setLabelsTarget} ids={setLabelsTarget?.ids ?? []}
         currentLabels={setLabelsTarget?.labels ?? []} onClose={() => setSetLabelsTarget(null)} />
       <RemoveTorrentDialog open={!!removeTarget} ids={removeTarget?.ids ?? []}

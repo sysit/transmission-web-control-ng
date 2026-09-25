@@ -3,7 +3,8 @@
 // Replicates old dialog-torrent-changeDownloadDir.html: new dir + move-data + recheck-data
 
 import { useState, useEffect } from 'react';
-import { Modal, Input, Checkbox, message } from 'antd';
+import { Modal, Input, Checkbox, App } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { exec as rpcExec } from '@/core/rpc/transmission-client';
 
 interface Props {
@@ -14,6 +15,8 @@ interface Props {
 }
 
 export default function ChangeDownloadDirDialog({ open, torrentIds, currentDir, onClose }: Props) {
+  const { message } = App.useApp();
+  const { t } = useTranslation();
   const [dir, setDir] = useState(currentDir);
   const [moveData, setMoveData] = useState(false);
   const [recheckData, setRecheckData] = useState(false);
@@ -25,7 +28,7 @@ export default function ChangeDownloadDirDialog({ open, torrentIds, currentDir, 
 
   const handleOk = async () => {
     const location = dir.trim();
-    if (!location) { message.warning('Enter a directory path'); return; }
+    if (!location) { message.warning(t('changeDir.enterDir')); return; }
     setSaving(true);
     try {
       const args: Record<string, unknown> = { ids: torrentIds, location };
@@ -34,32 +37,32 @@ export default function ChangeDownloadDirDialog({ open, torrentIds, currentDir, 
       if (recheckData) {
         await rpcExec({ method: 'torrent-verify', arguments: { ids: torrentIds } });
       }
-      message.success('Download directory changed');
+      message.success(t('changeDir.done'));
       onClose();
-    } catch { message.error('Failed to change directory'); }
+    } catch (e) { message.error(e instanceof Error ? e.message : t('changeDir.failed')); }
     finally { setSaving(false); }
   };
 
   return (
-    <Modal title="Change Download Directory" open={open} onOk={handleOk}
-      onCancel={onClose} confirmLoading={saving} destroyOnClose
-      okText="Change" cancelText="Cancel">
+    <Modal title={t('changeDir.title')} open={open} onOk={handleOk}
+      onCancel={onClose} confirmLoading={saving} destroyOnHidden
+      okText={t('changeDir.ok')} cancelText={t('changeDir.cancel')}>
       <div style={{ marginBottom: 4 }}>
-        <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>Current directory</div>
+        <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>{t('changeDir.currentDir')}</div>
         <div style={{ fontSize: 12, color: 'var(--eui-body-text)', wordBreak: 'break-all' }}>{currentDir || '—'}</div>
       </div>
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>New directory</div>
+        <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>{t('changeDir.newDir')}</div>
         <Input value={dir} onChange={(e) => setDir(e.target.value)}
           placeholder="Enter new download directory path…"
           style={{ fontFamily: 'monospace', fontSize: 12 }} />
       </div>
       <Checkbox checked={moveData} onChange={(e) => setMoveData(e.target.checked)}>
-        Move data from current location
+        {t('changeDir.moveData')}
       </Checkbox>
       <div style={{ marginTop: 6 }}>
         <Checkbox checked={recheckData} onChange={(e) => setRecheckData(e.target.checked)}>
-          Recheck data after moving
+          {t('changeDir.recheck')}
         </Checkbox>
       </div>
     </Modal>

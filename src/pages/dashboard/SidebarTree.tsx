@@ -5,6 +5,7 @@ import LegacyIcon from '@/components/LegacyIcon';
 import { useTranslation } from 'react-i18next';
 import type { TorrentCollection, SessionStats, TrackerInfo } from '@/core/rpc/rpc-types';
 import { TorrentStatus } from '@/core/rpc/rpc-types';
+import { useConfigStore } from '@/core/config/config-store';
 import { formatSize } from '@/lib/format';
 
 interface Props {
@@ -19,6 +20,7 @@ export default function SidebarTree({
   collection, trackers, sessionStats, selectedKey, onSelect,
 }: Props) {
   const { t } = useTranslation();
+  const userLabels = useConfigStore((s) => s.labels);
   const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
   const hasExpandedRef = useRef(false);
 
@@ -154,8 +156,21 @@ export default function SidebarTree({
       });
     }
 
+    // User labels — mirrors old resetNavLabels(): one colored child per
+    // config label; selecting filters torrents by RPC `labels` field.
+    if (userLabels.length > 0) {
+      items.push({
+        title: t('sidebar.labels'), key: 'labels', icon: <LegacyIcon name="tree-labels" size={14} />,
+        children: userLabels.map((l) => ({
+          title: l.name,
+          key: `label-${l.name}`,
+          icon: <span className="sidebar-label-dot" style={{ background: l.color }} />,
+        })),
+      });
+    }
+
     return items;
-  }, [collection, trackers, sessionStats, t, downloadingCount, seededCount, pausedCount, checkingCount, activeCount, errorCount, warningCount]);
+  }, [collection, trackers, sessionStats, t, userLabels, downloadingCount, seededCount, pausedCount, checkingCount, activeCount, errorCount, warningCount]);
 
   useEffect(() => {
     if (collection && !hasExpandedRef.current) {

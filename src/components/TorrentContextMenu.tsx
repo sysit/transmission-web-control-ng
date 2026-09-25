@@ -1,4 +1,4 @@
-import { Dropdown, message } from 'antd';
+import { Dropdown, App } from 'antd';
 import type { MenuProps } from 'antd';
 import { useTranslation } from 'react-i18next';
 import type { Torrent } from '@/core/rpc/rpc-types';
@@ -13,19 +13,25 @@ interface Props {
   x: number;
   y: number;
   onClose: () => void;
-  onRename?: (ids: number[], name: string) => void;
-  onRemove?: (ids: number[], deleteData: boolean) => void;
-  onChangeDir?: (ids: number[], dir: string) => void;
-  onSetLabels?: (ids: number[], labels: string[]) => void;
-  onSpeedLimit?: (ids: number[]) => void;
+  onRename: (ids: number[], name: string) => void;
+  onRemove: (ids: number[], deleteData: boolean) => void;
+  onChangeDir: (ids: number[], dir: string) => void;
+  onSetLabels: (ids: number[], labels: string[]) => void;
+  onSpeedLimit: (ids: number[]) => void;
 }
 
-async function copyToClipboard(text: string, label: string) {
+/** Clipboard helper — `message`/`t` come from the component scope. */
+async function copyToClipboard(
+  text: string,
+  label: string,
+  message: ReturnType<typeof App.useApp>['message'],
+  t: (key: string, opts?: Record<string, unknown>) => string,
+) {
   try {
     await navigator.clipboard.writeText(text);
-    message.success(`${label} copied`);
+    message.success(`${label} ${t("context.copied")}`);
   } catch {
-    message.error(`Failed to copy ${label}`);
+    message.error(t("context.copyFailed", { label }));
   }
 }
 
@@ -34,13 +40,16 @@ export default function TorrentContextMenu({
   onRename, onRemove, onChangeDir, onSetLabels, onSpeedLimit,
 }: Props) {
   const { t } = useTranslation();
+  const { message } = App.useApp();
   const removeTorrent = useRemoveTorrent();
   const ids = selectedIds.includes(torrent.id) ? selectedIds : [torrent.id];
   const isRunning = torrent.status === TorrentStatus.DOWNLOAD || torrent.status === TorrentStatus.SEED;
   const isStopped = torrent.status === TorrentStatus.STOPPED;
 
   const rpc = (method: string, args: Record<string, unknown>) =>
-    rpcExec({ method, arguments: args }).catch(() => {});
+    rpcExec({ method, arguments: args }).catch((e) => {
+      message.error(e instanceof Error ? e.message : String(e));
+    });
 
   const items: MenuProps['items'] = [
     {
@@ -56,13 +65,7 @@ export default function TorrentContextMenu({
     { type: 'divider' },
     {
       key: 'rename', label: t('context.rename'),
-      onClick: () => {
-        if (onRename) { onRename(ids, torrent.name); return; }
-        const newName = prompt('New name:', torrent.name);
-        if (newName && newName !== torrent.name) {
-          rpc('torrent-set', { ids, name: newName });
-        }
-      },
+      onClick: () => onRename(ids, torrent.name),
     },
     {
       key: 'remove', label: t('context.remove'), danger: true,
@@ -87,17 +90,11 @@ export default function TorrentContextMenu({
     },
     {
       key: 'changeDownloadDir', label: t('context.changeDownloadDir'),
-      onClick: () => {
-        if (onChangeDir) { onChangeDir(ids, torrent.downloadDir ?? ''); return; }
-        const dir = prompt('New download directory:', torrent.downloadDir ?? '');
-        if (dir) {
-          rpc('torrent-set-location', { ids, location: dir });
-        }
-      },
+      onClick: () => onChangeDir(ids, torrent.downloadDir ?? ''),
     },
     {
       key: 'copyPath', label: t('context.copyPath'),
-      onClick: () => copyToClipboard(torrent.downloadDir ?? '', 'Path'),
+      onClick: () => copyToClipboard(torrent.downloadDir ?? '', t('context.copyPath'), message, t),
     },
     { type: 'divider' },
     {
@@ -124,38 +121,15 @@ export default function TorrentContextMenu({
     { type: 'divider' },
     {
       key: 'magnetLink', label: t('context.magnetLink'),
-      onClick: () => copyToClipboard(torrent.magnetLink ?? '', 'Magnet link'),
+      onClick: () => copyToClipboard(torrent.magnetLink ?? '', t('context.magnetLink'), message, t),
     },
     {
       key: 'setLabels', label: t('context.setLabels'),
-      onClick: () => {
-        if (onSetLabels) { onSetLabels(ids, torrent.labels ?? []); return; }
-        const current = (torrent.labels ?? []).join(', ');
-        const input = prompt('Set labels (comma-separated). Leave blank to clear:', current);
-        if (input !== null) {
-          const labels = input.split(',').map((s) => s.trim()).filter(Boolean);
-          rpc('torrent-set', { ids, labels });
-        }
-      },
+      onClick: () => onSetLabels(ids, torrent.labels ?? []),
     },
     {
       key: 'setSpeedLimit', label: t('context.setSpeedLimit'),
-      onClick: () => {
-        if (onSpeedLimit) { onSpeedLimit(ids); return; }
-        const downloadLimit = prompt('Download speed limit (KB/s). Leave blank for no limit:');
-        if (downloadLimit !== null) {
-          const uploadLimit = prompt('Upload speed limit (KB/s). Leave blank for no limit:');
-          if (uploadLimit !== null) {
-            const args: Record<string, unknown> = { ids };
-            if (downloadLimit) args.downloadLimit = Number(downloadLimit);
-            if (uploadLimit) args.uploadLimit = Number(uploadLimit);
-            if (downloadLimit === '' && uploadLimit === '') {
-              args.honorsSessionLimits = false;
-            }
-            rpc('torrent-set', args);
-          }
-        }
-      },
+      onClick: () => onSpeedLimit(ids),
     },
   ];
 

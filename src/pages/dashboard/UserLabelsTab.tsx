@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { App, Button, Input, Space, Table, Typography } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { useConfigStore } from '@/core/config/config-store';
 import type { UserLabel } from '@/core/config/config-store';
 
@@ -14,6 +15,7 @@ const PALETTE = [
 ];
 
 export default function UserLabelsTab() {
+  const { t } = useTranslation();
   const labels = useConfigStore((s) => s.labels);
   const { message } = App.useApp();
   const [name, setName] = useState('');
@@ -22,8 +24,8 @@ export default function UserLabelsTab() {
 
   const addLabel = () => {
     const n = name.trim();
-    if (!n) { message.warning('Label name is required'); return; }
-    if (labels.some((l) => l.name === n)) { message.warning(`Label "${n}" already exists`); return; }
+    if (!n) { message.warning(t('settings.labelNameRequired')); return; }
+    if (labels.some((l) => l.name === n)) { message.warning(t('settings.labelExists', { name: n })); return; }
     useConfigStore.setState({ labels: [...labels, { name: n, description: desc.trim(), color }] });
     setName(''); setDesc('');
   };
@@ -38,13 +40,13 @@ export default function UserLabelsTab() {
     <div className="settings-dialog-pane">
       <Table<UserLabel>
         size="small"
-        rowKey={(_, i) => String(i)}
+        rowKey="name" // stable key — index keys make middle-row deletion shift input state
         dataSource={labels}
         pagination={false}
-        locale={{ emptyText: 'No labels yet' }}
+        locale={{ emptyText: t('settings.noLabels') }}
         columns={[
           {
-            title: 'Name', dataIndex: 'name', key: 'name',
+            title: t('settings.labelName'), dataIndex: 'name', key: 'name',
             render: (v: string, _r, i) => (
               <Input size="small" defaultValue={v}
                 onBlur={(e) => {
@@ -54,14 +56,14 @@ export default function UserLabelsTab() {
             ),
           },
           {
-            title: 'Description', dataIndex: 'description', key: 'description',
+            title: t('settings.labelDescription'), dataIndex: 'description', key: 'description',
             render: (v: string, _r, i) => (
               <Input size="small" defaultValue={v}
                 onBlur={(e) => { if (e.target.value !== v) updateLabel(i, { description: e.target.value }); }} />
             ),
           },
           {
-            title: 'Color', dataIndex: 'color', key: 'color', width: 90,
+            title: t('settings.labelColor'), dataIndex: 'color', key: 'color', width: 90,
             render: (v: string, _r, i) => (
               <input type="color" value={v}
                 style={{ width: 56, height: 24, border: 'none', padding: 0, cursor: 'pointer', background: 'transparent' }}
@@ -71,26 +73,26 @@ export default function UserLabelsTab() {
           {
             title: '', key: 'action', width: 64,
             render: (_v, _r, i) => (
-              <Button size="small" type="link" danger onClick={() => removeLabel(i)}>Delete</Button>
+              <Button size="small" type="link" danger onClick={() => removeLabel(i)}>{t('settings.delete')}</Button>
             ),
           },
         ]}
       />
 
       <Space size="small" wrap style={{ marginTop: 8 }}>
-        <Input size="small" placeholder="New label name" value={name}
+        <Input size="small" placeholder={t('settings.labelName')} value={name}
           onChange={(e) => setName(e.target.value)} style={{ width: 160 }} />
-        <Input size="small" placeholder="Description" value={desc}
+        <Input size="small" placeholder={t('settings.labelDescription')} value={desc}
           onChange={(e) => setDesc(e.target.value)} style={{ width: 160 }} />
         <input type="color" value={color}
           onChange={(e) => setColor(e.target.value)}
           style={{ width: 40, height: 24, border: 'none', padding: 0, cursor: 'pointer', background: 'transparent' }} />
-        <Button size="small" type="primary" onClick={addLabel}>Add Label</Button>
+        <Button size="small" type="primary" onClick={addLabel}>{t('settings.addLabel')}</Button>
       </Space>
 
       <div style={{ marginTop: 8 }}>
         <Text type="secondary" className="settings-dialog-hint">
-          Labels are saved in your browser config. Apply them to torrents via right-click → Set labels.
+          {t('settings.labelsHint')}
         </Text>
       </div>
     </div>

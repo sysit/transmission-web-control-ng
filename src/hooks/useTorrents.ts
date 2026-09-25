@@ -66,11 +66,13 @@ export function useTorrents(options?: TorrentsOptions) {
   });
 }
 
-export function useSessionStats() {
+export function useSessionStats(options?: TorrentsOptions) {
+  const interval = options?.interval ?? 5;
+  const autoRefresh = options?.autoRefresh ?? true;
   return useQuery({
     queryKey: ['session', 'stats'],
     queryFn: getSessionStats,
-    refetchInterval: 5000,
+    refetchInterval: autoRefresh ? interval * 1000 : false,
     staleTime: 3000,
   });
 }
@@ -163,8 +165,15 @@ export interface TorrentDetailData {
   hasLoadedBefore: boolean;
 }
 
-// Track which torrents have had their first load completed
-const loadedTorrents = new Set<number>();
+// Track which torrents have had their first load completed.
+// Keyed by hashString: Transmission reuses numeric ids after a restart,
+// so id-keyed entries would skip the metadata re-fetch for new torrents.
+const loadedTorrents = new Set<string>();
+
+interface DetailOptions {
+  /** Poll interval ms for the open detail panel, or false to disable */
+  refetchInterval?: number | false;
+}
 
 /**
  * Fetch extended torrent data on demand for the detail panel.
@@ -172,7 +181,7 @@ const loadedTorrents = new Set<number>();
  * First load requests the full field set (files, trackers, metadata).
  * Subsequent loads request only dynamic fields (fileStats, peers, etc.).
  */
-export function useTorrentDetail(id: number, enabled: boolean) {
+export function useTorrentDetail(id: number, enabled: boolean, options?: DetailOptions) {
   const qc = useQueryClient();
 
   return useQuery({
@@ -180,7 +189,14 @@ export function useTorrentDetail(id: number, enabled: boolean) {
     queryFn: async () => {
       if (id === 0) return null;
 
-      const hasLoadedBefore = loadedTorrents.has(id);
+      // Merge with cached base data
+      const existing = qc.getQueryData<TorrentData>(['torrents']);
+      const baseTorrent = existing?.collection.all[id];
+
+      // Key the "already fully loaded" marker by hash — ids are recycled
+      // by Transmission across restarts.
+      const loadedKey = baseTorrent?.hashString || String(id);
+      const hasLoadedBefore = loadedTorrents.has(loadedKey);
       const fields = hasLoadedBefore
         ? [...TORRENT_FIELDS_EXTENDED, ...TORRENT_FIELDS_CONFIG]
         : [...TORRENT_FIELDS_FIRST_LOAD, ...TORRENT_FIELDS_CONFIG];
@@ -190,15 +206,10 @@ export function useTorrentDetail(id: number, enabled: boolean) {
       if (!torrents || torrents.length === 0) return null;
 
       const torrent = torrents[0];
-
-      // Merge with cached base data
-      const existing = qc.getQueryData<TorrentData>(['torrents']);
-      const baseTorrent = existing?.collection.all[id];
       const merged: Torrent = { ...(baseTorrent ?? {}), ...torrent };
 
-      // Mark first load complete
       if (!hasLoadedBefore) {
-        loadedTorrents.add(id);
+        loadedTorrents.add(loadedKey);
         merged.moreInfosTag = true;
       }
 
@@ -208,6 +219,7 @@ export function useTorrentDetail(id: number, enabled: boolean) {
       return merged;
     },
     enabled: enabled && id > 0,
+    refetchInterval: options?.refetchInterval ?? false,
     staleTime: 3000,
     refetchOnWindowFocus: false,
     gcTime: 600000,

@@ -13,6 +13,7 @@ import {
 } from '@/core/rpc/transmission-client';
 import { useSessionConfig } from '@/hooks/useTorrents';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 const { TextArea } = Input;
 const { Dragger } = Upload;
@@ -32,6 +33,7 @@ export default function AddTorrentDialog({
   const [uploading, setUploading] = useState(false);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [progress, setProgress] = useState('');
+  const { t } = useTranslation();
   const { message } = App.useApp();
   const { data: sessionConfig } = useSessionConfig();
   const qc = useQueryClient();
@@ -54,13 +56,13 @@ export default function AddTorrentDialog({
         setDefaultDir: false,
       });
     }
-  }, [open, form, defaultDownloadDir, sessionConfig]);
+  }, [open, form, defaultDownloadDir, sessionConfig, t]);
 
   const applyDefaultDir = useCallback(async (dir: string) => {
     if (form.getFieldValue('setDefaultDir') && dir) {
       try {
         await rpcExec({ method: 'session-set', arguments: { 'download-dir': dir } });
-        qc.invalidateQueries({ queryKey: ['session-config'] });
+        qc.invalidateQueries({ queryKey: ['session', 'config'] });
       } catch { /* non-fatal: default dir not persisted */ }
     }
   }, [form, qc]);
@@ -83,7 +85,7 @@ export default function AddTorrentDialog({
         uploaded++;
         setProgress(`${uploaded}/${total}`);
       } catch {
-        message.error(`Failed to upload: ${file.name}`);
+        message.error(t('addTorrent.fileFailed', { name: file.name }));
       }
     }
 
@@ -92,7 +94,7 @@ export default function AddTorrentDialog({
     setProgress('');
     qc.invalidateQueries({ queryKey: ['torrents'] });
     onClose();
-  }, [fileList, form, defaultDownloadDir, message, qc, onClose, applyDefaultDir]);
+  }, [fileList, form, defaultDownloadDir, message, qc, onClose, applyDefaultDir, t]);
 
   const handleSubmitUrl = useCallback(async () => {
     const url = form.getFieldValue('url');
@@ -108,7 +110,7 @@ export default function AddTorrentDialog({
       try {
         await addTorrentFromUrl(u.trim(), dir, paused);
       } catch {
-        message.error(`Failed to add: ${u.trim().substring(0, 60)}...`);
+        message.error(t('addTorrent.urlFailed', { url: u.trim().substring(0, 60) }));
       }
       done++;
       setProgress(`${done}/${urls.length}`);
@@ -119,7 +121,7 @@ export default function AddTorrentDialog({
     setProgress('');
     qc.invalidateQueries({ queryKey: ['torrents'] });
     onClose();
-  }, [form, defaultDownloadDir, message, qc, onClose, applyDefaultDir]);
+  }, [form, defaultDownloadDir, message, qc, onClose, applyDefaultDir, t]);
 
   const handleOk = useCallback(async () => {
     const url = form.getFieldValue('url');
@@ -128,35 +130,35 @@ export default function AddTorrentDialog({
     } else if (url && url.trim()) {
       await handleSubmitUrl();
     } else {
-      message.warning('Please provide a torrent URL or select a file to upload.');
+      message.warning(t('addTorrent.needUrlOrFile'));
     }
-  }, [form, fileList, handleUploadFile, handleSubmitUrl, message]);
+  }, [form, fileList, handleUploadFile, handleSubmitUrl, message, t]);
 
   return (
     <Modal
-      title="Add Torrent"
+      title={t('addTorrent.title')}
       open={open}
       onOk={handleOk}
       onCancel={onClose}
       confirmLoading={uploading}
-      okText="Add"
+      okText={t('addTorrent.add')}
       width={560}
-      destroyOnClose
+      destroyOnHidden
     >
       <Form form={form} layout="vertical" style={{ marginTop: 12 }}>
-        <Form.Item name="downloadDir" label="Download Directory">
+        <Form.Item name="downloadDir" label={t('addTorrent.downloadDir')}>
           <Select
             showSearch
             options={dirOptions}
-            placeholder="Select download directory"
+            placeholder={t('addTorrent.selectDir')}
           />
         </Form.Item>
 
         <Form.Item name="setDefaultDir" valuePropName="checked" style={{ marginBottom: 8 }}>
-          <Checkbox>Set as default directory</Checkbox>
+          <Checkbox>{t('addTorrent.setDefaultDir')}</Checkbox>
         </Form.Item>
 
-        <Form.Item label="Upload Torrent File(s)">
+        <Form.Item label={t('addTorrent.uploadFiles')}>
           <Dragger
             multiple
             fileList={fileList}
@@ -168,25 +170,25 @@ export default function AddTorrentDialog({
             <p className="ant-upload-drag-icon">
               <LegacyIcon name="add-torrent" size={36} />
             </p>
-            <p className="ant-upload-text">Click or drag .torrent files to this area</p>
+            <p className="ant-upload-text">{t('addTorrent.dropHint')}</p>
           </Dragger>
         </Form.Item>
 
-        <Form.Item name="url" label="Or Enter Torrent URL / Magnet Link">
+        <Form.Item name="url" label={t('addTorrent.urlLabel')}>
           <TextArea
             rows={5}
-            placeholder={'Enter one or more torrent URLs or magnet links, one per line.\n\nExamples:\nhttps://example.com/file.torrent\nmagnet:?xt=urn:btih:...'}
+            placeholder={t('addTorrent.urlPlaceholder')}
             disabled={uploading}
           />
         </Form.Item>
 
-        <Form.Item name="autoStart" valuePropName="checked" label="Start when added">
-          <Checkbox>Start when added</Checkbox>
+        <Form.Item name="autoStart" valuePropName="checked" label={t('addTorrent.autoStart')}>
+          <Checkbox>{t('addTorrent.autoStart')}</Checkbox>
         </Form.Item>
 
         {progress && (
           <div style={{ textAlign: 'center', marginTop: -8, marginBottom: 8 }}>
-            <Text type="secondary">Uploading: {progress}</Text>
+            <Text type="secondary">{t('addTorrent.uploading', { progress })}</Text>
           </div>
         )}
       </Form>

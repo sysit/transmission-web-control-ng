@@ -2,6 +2,7 @@ import { useMemo, useState, useCallback } from 'react';
 import { Table, Checkbox } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { ResizeCallbackData } from 'react-resizable';
+import { useTranslation } from 'react-i18next';
 import type { Torrent } from '@/core/rpc/rpc-types';
 import { TorrentStatus } from '@/core/rpc/rpc-types';
 import {
@@ -19,16 +20,21 @@ interface Props {
   onContextMenu: (torrent: Torrent, e: React.MouseEvent) => void;
   onRowSelect?: (torrent: Torrent) => void;
   selectedTorrentId?: number;
+  /** Controlled sort — sorting happens on the FULL filtered list in the parent,
+   *  not just the visible page. */
+  sortState?: SortState | null;
+  onSortChange?: (s: SortState | null) => void;
 }
 
+// i18n keys for status labels (translated at render time)
 const STATUS_MAP: Record<number, [string, string]> = {
-  [TorrentStatus.STOPPED]: ['Stopped', '#999'],
-  [TorrentStatus.CHECK_WAIT]: ['ChkWait', '#fa0'],
-  [TorrentStatus.CHECK]: ['Checking', '#fa0'],
-  [TorrentStatus.DOWNLOAD_WAIT]: ['DlWait', '#2db7f5'],
-  [TorrentStatus.DOWNLOAD]: ['Download', '#2db7f5'],
-  [TorrentStatus.SEED_WAIT]: ['SdWait', '#87d068'],
-  [TorrentStatus.SEED]: ['Seeding', '#87d068'],
+  [TorrentStatus.STOPPED]: ['statusStopped', '#999'],
+  [TorrentStatus.CHECK_WAIT]: ['statusChkWait', '#fa0'],
+  [TorrentStatus.CHECK]: ['statusChecking', '#fa0'],
+  [TorrentStatus.DOWNLOAD_WAIT]: ['statusDlWait', '#2db7f5'],
+  [TorrentStatus.DOWNLOAD]: ['statusDownloading', '#2db7f5'],
+  [TorrentStatus.SEED_WAIT]: ['statusSdWait', '#87d068'],
+  [TorrentStatus.SEED]: ['statusSeeding', '#87d068'],
 };
 
 /** Map torrent status to the icon name used before the torrent name */
@@ -115,10 +121,16 @@ function saveVisibleColumns(cols: string[]) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(cols)); } catch { /* ignore */ }
 }
 
+export interface SortState {
+  key: string;
+  order: 'ascend' | 'descend';
+}
+
 export default function TorrentTable({
   torrents, loading, selectedIds, onSelectionChange, onContextMenu,
-  onRowSelect, selectedTorrentId,
+  onRowSelect, selectedTorrentId, sortState, onSortChange,
 }: Props) {
+  const { t } = useTranslation();
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const [visibleColumns, setVisibleColumns] = useState<string[]>(loadVisibleColumns);
   const [colMenuState, setColMenuState] = useState<{ x: number; y: number } | null>(null);
@@ -218,7 +230,7 @@ export default function TorrentTable({
           ),
         },
         {
-          title: 'Name', dataIndex: 'name', key: 'name', width: getWidth('name'), ellipsis: true,
+          title: t('table.name'), dataIndex: 'name', key: 'name', width: getWidth('name'), ellipsis: true,
           sorter: (a, b) => a.name.localeCompare(b.name),
           ...hc('name'),
           render: (name: string, record: Torrent) => (
@@ -231,13 +243,13 @@ export default function TorrentTable({
           ),
         },
         {
-          title: 'Size', dataIndex: 'totalSize', key: 'totalSize', width: getWidth('totalSize'), align: 'right',
+          title: t('table.size'), dataIndex: 'totalSize', key: 'totalSize', width: getWidth('totalSize'), align: 'right',
           sorter: (a, b) => a.totalSize - b.totalSize,
           ...hc('totalSize'),
           render: (v: number) => <span>{formatSize(v)}</span>,
         },
         {
-          title: 'Progress', dataIndex: 'percentDone', key: 'percentDone', width: getWidth('percentDone'), align: 'center',
+          title: t('table.progress'), dataIndex: 'percentDone', key: 'percentDone', width: getWidth('percentDone'), align: 'center',
           sorter: (a, b) => a.percentDone - b.percentDone,
           ...hc('percentDone'),
           render: (v: number, record: Torrent) => {
@@ -253,7 +265,7 @@ export default function TorrentTable({
           },
         },
         {
-          title: 'ETA', key: 'eta', width: getWidth('eta'), align: 'right',
+          title: t('table.eta'), key: 'eta', width: getWidth('eta'), align: 'right',
           sorter: (a, b) => (a.remainingTime ?? Infinity) - (b.remainingTime ?? Infinity),
           ...hc('eta'),
           render: (_: unknown, r: Torrent) => (
@@ -265,7 +277,7 @@ export default function TorrentTable({
           ),
         },
         {
-          title: 'Ratio', dataIndex: 'uploadRatio', key: 'uploadRatio', width: getWidth('uploadRatio'), align: 'right',
+          title: t('table.ratio'), dataIndex: 'uploadRatio', key: 'uploadRatio', width: getWidth('uploadRatio'), align: 'right',
           sorter: (a, b) => a.uploadRatio - b.uploadRatio,
           ...hc('uploadRatio'),
           render: (v: number) => (
@@ -275,7 +287,7 @@ export default function TorrentTable({
           ),
         },
         {
-          title: 'Status', key: 'statusCol', width: getWidth('statusCol'), align: 'center',
+          title: t('table.status'), key: 'statusCol', width: getWidth('statusCol'), align: 'center',
           sorter: (a, b) => a.status - b.status,
           ...hc('statusCol'),
           render: (_: unknown, r: Torrent) => {
@@ -283,21 +295,21 @@ export default function TorrentTable({
             if (!s) return null;
             // Old UI renders status as plain text; error→red, warning→#cc9900
             const color = r.error ? 'red' : r.warning ? '#cc9900' : undefined;
-            return <span style={color ? { color } : undefined}>{s[0]}</span>;
+            return <span style={color ? { color } : undefined}>{t(s[0])}</span>;
           },
         },
         {
-          title: 'Seeds', dataIndex: 'seederCount', key: 'seederCount', width: getWidth('seederCount'), align: 'center',
+          title: t('table.seeds'), dataIndex: 'seederCount', key: 'seederCount', width: getWidth('seederCount'), align: 'center',
           ...hc('seederCount'),
           render: (v: number | undefined) => v != null ? <span>{v}</span> : null,
         },
         {
-          title: 'Peers', dataIndex: 'leecherCount', key: 'leecherCount', width: getWidth('leecherCount'), align: 'center',
+          title: t('table.peers'), dataIndex: 'leecherCount', key: 'leecherCount', width: getWidth('leecherCount'), align: 'center',
           ...hc('leecherCount'),
           render: (v: number | undefined) => v != null ? <span>{v}</span> : null,
         },
         {
-          title: '↓ Speed', dataIndex: 'rateDownload', key: 'rateDownload', width: getWidth('rateDownload'), align: 'right',
+          title: t('table.download'), dataIndex: 'rateDownload', key: 'rateDownload', width: getWidth('rateDownload'), align: 'right',
           sorter: (a, b) => a.rateDownload - b.rateDownload,
           ...hc('rateDownload'),
           render: (v: number) => (
@@ -305,7 +317,7 @@ export default function TorrentTable({
           ),
         },
         {
-          title: '↑ Speed', dataIndex: 'rateUpload', key: 'rateUpload', width: getWidth('rateUpload'), align: 'right',
+          title: t('table.upload'), dataIndex: 'rateUpload', key: 'rateUpload', width: getWidth('rateUpload'), align: 'right',
           sorter: (a, b) => a.rateUpload - b.rateUpload,
           ...hc('rateUpload'),
           render: (v: number) => (
@@ -313,53 +325,53 @@ export default function TorrentTable({
           ),
         },
         {
-          title: 'Downloaded', dataIndex: 'completeSize', key: 'completeSize', width: getWidth('completeSize'), align: 'right',
+          title: t('table.downloaded'), dataIndex: 'completeSize', key: 'completeSize', width: getWidth('completeSize'), align: 'right',
           sorter: (a, b) => (a.completeSize ?? 0) - (b.completeSize ?? 0),
           ...hc('completeSize'),
           render: (v: number | undefined) => <span>{v != null ? formatSize(v) : ''}</span>,
         },
         {
-          title: 'Uploaded', dataIndex: 'uploadedEver', key: 'uploadedEver', width: getWidth('uploadedEver'), align: 'right',
+          title: t('table.uploaded'), dataIndex: 'uploadedEver', key: 'uploadedEver', width: getWidth('uploadedEver'), align: 'right',
           sorter: (a, b) => a.uploadedEver - b.uploadedEver,
           ...hc('uploadedEver'),
           render: (v: number) => <span>{formatSize(v)}</span>,
         },
         {
-          title: 'Added', dataIndex: 'addedDate', key: 'addedDate', width: getWidth('addedDate'), align: 'center',
+          title: t('table.added'), dataIndex: 'addedDate', key: 'addedDate', width: getWidth('addedDate'), align: 'center',
           sorter: (a, b) => a.addedDate - b.addedDate,
           ...hc('addedDate'),
           render: (v: number) => <span>{formatDate(v)}</span>,
         },
         {
-          title: 'ID', dataIndex: 'id', key: 'idCol', width: getWidth('idCol'), align: 'center',
+          title: t('table.id'), dataIndex: 'id', key: 'idCol', width: getWidth('idCol'), align: 'center',
           sorter: (a, b) => a.id - b.id,
           ...hc('idCol'),
           render: (v: number) => <span>{v}</span>,
         },
         {
-          title: 'Queue', dataIndex: 'queuePosition', key: 'queuePosition', width: getWidth('queuePosition'), align: 'center',
+          title: t('table.queue'), dataIndex: 'queuePosition', key: 'queuePosition', width: getWidth('queuePosition'), align: 'center',
           sorter: (a, b) => a.queuePosition - b.queuePosition,
           ...hc('queuePosition'),
           render: (v: number) => <span>{v}</span>,
         },
         {
-          title: 'Trackers', dataIndex: 'trackers', key: 'trackersCol', width: getWidth('trackersCol'), ellipsis: true,
+          title: t('table.trackers'), dataIndex: 'trackers', key: 'trackersCol', width: getWidth('trackersCol'), ellipsis: true,
           ...hc('trackersCol'),
           render: (v: string | undefined) => <span style={{ fontSize: 11 }}>{v ?? ''}</span>,
         },
         {
-          title: 'Path', dataIndex: 'downloadDir', key: 'downloadDir', width: getWidth('downloadDir'), ellipsis: true,
+          title: t('table.path'), dataIndex: 'downloadDir', key: 'downloadDir', width: getWidth('downloadDir'), ellipsis: true,
           ...hc('downloadDir'),
           render: (v: string) => <span style={{ fontSize: 11 }} title={v}>{v}</span>,
         },
         {
-          title: 'Last Activity', dataIndex: 'activityDate', key: 'activityDate', width: getWidth('activityDate'), align: 'center',
+          title: t('table.lastActivity'), dataIndex: 'activityDate', key: 'activityDate', width: getWidth('activityDate'), align: 'center',
           sorter: (a, b) => a.activityDate - b.activityDate,
           ...hc('activityDate'),
           render: (v: number) => <span>{v > 0 ? formatDate(v) : ''}</span>,
         },
         {
-          title: 'Labels', dataIndex: 'labels', key: 'labels', width: getWidth('labels'), ellipsis: true,
+          title: t('table.labels'), dataIndex: 'labels', key: 'labels', width: getWidth('labels'), ellipsis: true,
           ...hc('labels'),
           render: (v: string[] | undefined) => {
             const names = v ?? [];
@@ -382,15 +394,20 @@ export default function TorrentTable({
           },
         },
         {
-          title: 'Done', dataIndex: 'doneDate', key: 'doneDate', width: getWidth('doneDate'), align: 'center',
+          title: t('table.done'), dataIndex: 'doneDate', key: 'doneDate', width: getWidth('doneDate'), align: 'center',
           sorter: (a, b) => a.doneDate - b.doneDate,
           ...hc('doneDate'),
           render: (v: number) => <span>{v > 0 ? formatDate(v) : ''}</span>,
         },
       ];
-      return allCols.filter((c) => visibleColumns.includes(c.key as string));
+      // Controlled sort — parent sorts the full filtered list; here we only
+      // reflect the active sort on the matching column header.
+      const withSort = allCols.map((c) =>
+        sortState && c.key === sortState.key ? { ...c, sortOrder: sortState.order } : c,
+      );
+      return withSort.filter((c) => visibleColumns.includes(c.key as string));
     },
-    [getWidth, hc, visibleColumns, allSelected, someSelected, handleSelectAll, handleSelectOne, selectedIds, onContextMenu, labelColorMap],
+    [getWidth, hc, visibleColumns, allSelected, someSelected, handleSelectAll, handleSelectOne, selectedIds, onContextMenu, labelColorMap, t, sortState],
   );
 
   const toggleableColumns = ALL_COLUMN_KEYS.filter((k) => k !== '#' && k !== 'checkbox');
@@ -401,6 +418,12 @@ export default function TorrentTable({
         columns={columns} dataSource={torrents} rowKey="id"
         loading={loading} size="small"
         pagination={false}
+        onChange={(_p, _f, sorter) => {
+          const s = Array.isArray(sorter) ? sorter[0] : sorter;
+          onSortChange?.(s?.column && s?.order
+            ? { key: String(s.column.key ?? s.field), order: s.order }
+            : null);
+        }}
         components={{
           header: { cell: ResizableTitle },
         }}
@@ -426,25 +449,25 @@ export default function TorrentTable({
           <div className="context-menu-popup"
             style={{ left: colMenuState.x, top: colMenuState.y }}>
             {toggleableColumns.map((key) => {
-              const title = key === 'statusCol' ? 'Status' :
-                key === 'idCol' ? 'ID' :
-                key === 'trackersCol' ? 'Trackers' :
-                key === 'downloadDir' ? 'Path' :
-                key === 'totalSize' ? 'Size' :
-                key === 'percentDone' ? 'Progress' :
-                key === 'eta' ? 'ETA' :
-                key === 'uploadRatio' ? 'Ratio' :
-                key === 'seederCount' ? 'Seeds' :
-                key === 'leecherCount' ? 'Peers' :
-                key === 'rateDownload' ? '↓ Speed' :
-                key === 'rateUpload' ? '↑ Speed' :
-                key === 'completeSize' ? 'Downloaded' :
-                key === 'uploadedEver' ? 'Uploaded' :
-                key === 'addedDate' ? 'Added' :
-                key === 'queuePosition' ? 'Queue' :
-                key === 'activityDate' ? 'Last Activity' :
-                key === 'labels' ? 'Labels' :
-                key === 'doneDate' ? 'Done' :
+              const title = key === 'statusCol' ? t('table.status') :
+                key === 'idCol' ? t('table.id') :
+                key === 'trackersCol' ? t('table.trackers') :
+                key === 'downloadDir' ? t('table.path') :
+                key === 'totalSize' ? t('table.size') :
+                key === 'percentDone' ? t('table.progress') :
+                key === 'eta' ? t('table.eta') :
+                key === 'uploadRatio' ? t('table.ratio') :
+                key === 'seederCount' ? t('table.seeds') :
+                key === 'leecherCount' ? t('table.peers') :
+                key === 'rateDownload' ? t('table.download') :
+                key === 'rateUpload' ? t('table.upload') :
+                key === 'completeSize' ? t('table.downloaded') :
+                key === 'uploadedEver' ? t('table.uploaded') :
+                key === 'addedDate' ? t('table.added') :
+                key === 'queuePosition' ? t('table.queue') :
+                key === 'activityDate' ? t('table.lastActivity') :
+                key === 'labels' ? t('table.labels') :
+                key === 'doneDate' ? t('table.done') :
                 key;
               return (
                 <div className="context-menu-item" key={key}

@@ -99,6 +99,8 @@ export const ICON_MAP: Record<string, IconDef> = {
   'tree-server-error': { className: 'tr-icon-server-error',  alt: 'Server Error' },
   'tree-chart':        { className: 'tr-icon-shuju',         alt: 'Statistics' },
   'tree-filter':       { className: 'tr-icon-label',         alt: 'Filter' },
+  'tree-labels':       { className: 'tr-icon-labels',        alt: 'Labels' },
+  'tree-label':        { className: 'tr-icon-label',         alt: 'Label' },
   'tree-folder':       { className: 'tr-icon-folder',        alt: 'Folder' },
   'tree-file':         { className: 'tr-icon-file',          alt: 'File' },
   'tree-stat-leaf':    { className: 'tr-icon-empty',         alt: 'Statistic' },

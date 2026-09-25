@@ -2,6 +2,7 @@
 // Shows Transmission version + RPC version, web-control version, and links
 
 import { Modal, Typography, Space, Divider } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { useSessionConfig } from '@/hooks/useTorrents';
 
 const { Text } = Typography;
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export default function AboutDialog({ open, onClose }: Props) {
+  const { t } = useTranslation();
   const { data: sessionConfig } = useSessionConfig();
 
   const trVersion = sessionConfig?.version ?? '';
@@ -37,12 +39,12 @@ export default function AboutDialog({ open, onClose }: Props) {
 
   return (
     <Modal
-      title="About"
+      title={t('about.title')}
       open={open}
       onCancel={onClose}
       footer={null}
       width={420}
-      destroyOnClose
+      destroyOnHidden
     >
       <div style={{ textAlign: 'center', padding: '12px 0 4px' }}>
         <img
@@ -61,16 +63,16 @@ export default function AboutDialog({ open, onClose }: Props) {
       <Space direction="vertical" size={2} style={{ width: '100%', fontSize: 12 }}>
         {trVersion && (
           <div style={{ fontSize: 12 }}>
-            <Text type="secondary">Transmission: </Text>
+            <Text type="secondary">{t('about.transmission')}</Text>
             <Text>{trVersion}{rpcVersion ? `, RPC: ${rpcVersion}` : ''}</Text>
           </div>
         )}
         <div style={{ fontSize: 12 }}>
-          <Text type="secondary">Web Control: </Text>
+          <Text type="secondary">{t('about.webControl')}</Text>
           <Text>{WEB_CONTROL_VERSION}</Text>
         </div>
         <div style={{ fontSize: 12 }}>
-          <Text type="secondary">Copyright (c) 2012-2019 栽培者</Text>
+          <Text type="secondary">{t('about.copyright')}</Text>
         </div>
       </Space>
 
@@ -86,7 +88,7 @@ export default function AboutDialog({ open, onClose }: Props) {
       <Divider style={{ margin: '8px 0' }} />
 
       <div style={{ textAlign: 'center', fontSize: 12 }}>
-        <Text type="secondary">Thanks to </Text>
+        <Text type="secondary">{t('about.thanks')}</Text>
         <Space size="small" wrap style={{ justifyContent: 'center', fontSize: 12 }}>
           {thanks.map((t) => (
             <a key={t.label} href={t.href} target="_blank" rel="noreferrer"

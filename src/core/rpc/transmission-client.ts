@@ -43,12 +43,15 @@ export async function exec<TArgs = Record<string, unknown>, TResult = Record<str
     body: JSON.stringify(body),
   });
 
-  // Handle 409 — renew Session-Id and retry once
+  // Handle 409 — renew Session-Id and retry once.
+  // Retry only when the challenge actually carried a new id, otherwise the
+  // retry is a guaranteed duplicate failure.
   if (response.status === 409) {
     const sid = response.headers.get('X-Transmission-Session-Id');
-    if (sid) {
-      session.setSessionId(sid);
+    if (!sid) {
+      throw new Error('RPC session rejected: missing X-Transmission-Session-Id on 409');
     }
+    session.setSessionId(sid);
     response = await fetch(session.getRpcPath(), {
       method: 'POST',
       headers: {
@@ -63,7 +66,14 @@ export async function exec<TArgs = Record<string, unknown>, TResult = Record<str
     throw new Error(`RPC error: ${response.status} ${response.statusText}`);
   }
 
-  return response.json() as Promise<RpcResponse<TResult>>;
+  const json = await response.json() as RpcResponse<TResult>;
+  // Transmission reports semantic failures ("unrecognized info",
+  // "invalid or corrupt torrent file", …) as HTTP 200 + result != "success".
+  // Surface them as rejections so callers don't mistake them for success.
+  if (json.result && json.result !== 'success') {
+    throw new Error(json.result);
+  }
+  return json;
 }
 
 // ---- High-level API methods ----

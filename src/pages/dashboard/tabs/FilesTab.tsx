@@ -2,7 +2,10 @@
 // Called by TorrentDetailPanel when the "Files" tab is active
 
 import { useState, useMemo, useCallback } from 'react';
-import { Table, Button, Progress, Input, Dropdown, Space, message } from 'antd';
+import { Table, Button, Progress, Input, Dropdown, Space } from 'antd';
+import { App } from 'antd';
+import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import type { ColumnsType } from 'antd/es/table';
 import type { TorrentFile, TorrentFileStat } from '@/core/rpc/rpc-types';
 import { exec as rpcExec } from '@/core/rpc/transmission-client';
@@ -26,13 +29,17 @@ interface Props {
   fileStats?: TorrentFileStat[];
 }
 
+// i18n keys, resolved via t() in the render cell
 const PRIORITY_LABELS: Record<number, string> = {
-  1: 'High',
-  0: 'Normal',
-  [-1]: 'Low',
+  1: 'files.high',
+  0: 'files.normal',
+  [-1]: 'files.low',
 };
 
 export default function FilesTab({ torrentId, torrentName, files, fileStats }: Props) {
+  const { t } = useTranslation();
+  const { message } = App.useApp();
+  const qc = useQueryClient();
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [filterText, setFilterText] = useState('');
   const [saving, setSaving] = useState(false);
@@ -62,20 +69,28 @@ export default function FilesTab({ torrentId, torrentName, files, fileStats }: P
 
   const filteredData = useMemo(() => {
     if (!filterText) return dataSource;
-    const re = new RegExp(filterText, 'i');
-    return dataSource.filter((f) => re.test(f.name));
+    // Regex on raw user input throws on metacharacters ("(", "[", "+") —
+    // fall back to a plain substring match instead of crashing the app.
+    try {
+      const re = new RegExp(filterText, 'i');
+      return dataSource.filter((f) => re.test(f.name));
+    } catch {
+      const kw = filterText.toLowerCase();
+      return dataSource.filter((f) => f.name.toLowerCase().includes(kw));
+    }
   }, [dataSource, filterText]);
 
   const callSetFiles = useCallback(async (args: Record<string, unknown>) => {
     setSaving(true);
     try {
       await rpcExec({ method: 'torrent-set', arguments: { ids: [torrentId], ...args } });
-    } catch {
-      message.error('Operation failed');
+      qc.invalidateQueries({ queryKey: ['torrent', 'detail', torrentId] });
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : t('files.failed'));
     } finally {
       setSaving(false);
     }
-  }, [torrentId]);
+  }, [torrentId, message, qc, t]);
 
   const handleAllow = () => {
     const indices = selectedRowKeys.map(Number);
@@ -99,26 +114,26 @@ export default function FilesTab({ torrentId, torrentName, files, fileStats }: P
   };
 
   const columns: ColumnsType<FileRow> = [
-    { title: 'Name', dataIndex: 'name', key: 'name', width: 300, ellipsis: true,
+    { title: t('files.name'), dataIndex: 'name', key: 'name', width: 300, ellipsis: true,
       sorter: (a, b) => a.name.localeCompare(b.name),
       render: (v: string) => <span>{v}</span>,
     },
-    { title: 'Size', dataIndex: 'length', key: 'length', width: 80, align: 'right',
+    { title: t('files.size'), dataIndex: 'length', key: 'length', width: 80, align: 'right',
       sorter: (a, b) => a.length - b.length,
       render: (v: number) => <span>{formatSize(v)}</span>,
     },
-    { title: 'Progress', dataIndex: 'percentDone', key: 'percentDone', width: 70, align: 'center',
+    { title: t('files.progress'), dataIndex: 'percentDone', key: 'percentDone', width: 70, align: 'center',
       sorter: (a, b) => a.percentDone - b.percentDone,
       render: (v: number) => (
         <Progress percent={v} size="small" showInfo={false}
           style={{ margin: 0 }} strokeLinecap="butt" />
       ),
     },
-    { title: 'Downloaded', dataIndex: 'bytesCompleted', key: 'bytesCompleted', width: 80, align: 'right',
+    { title: t('files.downloaded'), dataIndex: 'bytesCompleted', key: 'bytesCompleted', width: 80, align: 'right',
       sorter: (a, b) => a.bytesCompleted - b.bytesCompleted,
       render: (v: number) => <span>{formatSize(v)}</span>,
     },
-    { title: 'Wanted', dataIndex: 'wanted', key: 'wanted', width: 60, align: 'center',
+    { title: t('files.wanted'), dataIndex: 'wanted', key: 'wanted', width: 60, align: 'center',
       render: (v: boolean) => v
         ? <LegacyIcon name="ok" size={12} style={{ color: '#52c41a' }} />
         : <LegacyIcon name="cancel" size={12} style={{ color: '#ff4d4f' }} />,
@@ -127,7 +142,7 @@ export default function FilesTab({ torrentId, torrentName, files, fileStats }: P
       render: (v: number) => {
         const colors: Record<number, string> = { 1: '#52c41a', 0: '#999', [-1]: '#faad14' };
         return <span style={{ color: colors[v] ?? '#999' }}>
-          <LegacyIcon name="flag-normal" size={12} style={{ marginRight: 2 }} />{PRIORITY_LABELS[v] ?? v}
+          <LegacyIcon name="flag-normal" size={12} style={{ marginRight: 2 }} />{t(PRIORITY_LABELS[v] ?? '') ?? v}
         </span>;
       },
     },
@@ -139,19 +154,19 @@ export default function FilesTab({ torrentId, torrentName, files, fileStats }: P
     <div style={{ padding: 0 }}>
       <Space size={4} style={{ marginBottom: 4 }}>
         <Button size="small" icon={<LegacyIcon name="allow" size={14} />} loading={saving}
-          disabled={selectedRowKeys.length === 0} onClick={handleAllow}>Allow</Button>
+          disabled={selectedRowKeys.length === 0} onClick={handleAllow}>{t('files.allow')}</Button>
         <Button size="small" icon={<LegacyIcon name="deny" size={14} />} loading={saving}
-          disabled={selectedRowKeys.length === 0} onClick={handleDeny}>Deny</Button>
+          disabled={selectedRowKeys.length === 0} onClick={handleDeny}>{t('files.deny')}</Button>
         <Dropdown menu={{
           items: [
-            { key: 'high', label: 'High Priority', onClick: () => handlePriority(1) },
-            { key: 'normal', label: 'Normal Priority', onClick: () => handlePriority(0) },
-            { key: 'low', label: 'Low Priority', onClick: () => handlePriority(-1) },
+            { key: 'high', label: t('files.high'), onClick: () => handlePriority(1) },
+            { key: 'normal', label: t('files.normal'), onClick: () => handlePriority(0) },
+            { key: 'low', label: t('files.low'), onClick: () => handlePriority(-1) },
           ],
         }} disabled={selectedRowKeys.length === 0}>
-          <Button size="small" icon={<LegacyIcon name="flag-normal" size={14} />}>Priority</Button>
+          <Button size="small" icon={<LegacyIcon name="flag-normal" size={14} />}>{t('files.priorityLabel')}</Button>
         </Dropdown>
-        <Input size="small" placeholder="Filter…" prefix={<LegacyIcon name="filter" size={14} />}
+        <Input size="small" placeholder={t('files.filter')} prefix={<LegacyIcon name="filter" size={14} />}
           style={{ width: 120 }} value={filterText}
           onChange={(e) => setFilterText(e.target.value)} allowClear />
       </Space>
