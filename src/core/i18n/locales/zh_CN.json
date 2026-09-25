@@ -133,5 +133,15 @@
     "free": "剩余",
     "version": "Transmission",
     "webControl": "Web Control"
+  },
+  "dialog": {
+    "remove": {
+      "title": "删除种子确认",
+      "confirm-text": "确认要删除已选择的种子吗？",
+      "confirm-text-multi": "确认要删除已选择的 {{count}} 个种子吗？",
+      "remove-data": "同时删除数据",
+      "remove-error": "种子删除失败！",
+      "ok": "删除", "cancel": "取消"
+    }
   }
 }

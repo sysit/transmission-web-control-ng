@@ -4,7 +4,7 @@ import type { MenuProps } from 'antd';
 import LegacyIcon from '@/components/LegacyIcon';
 import {
   useTorrents, useSessionStats, useSessionConfig, useFreeSpace,
-  useRemoveTorrent, useStartTorrent, useStopTorrent,
+  useStartTorrent, useStopTorrent,
 } from '@/hooks/useTorrents';
 import { exec as rpcExec } from '@/core/rpc/transmission-client';
 import { TorrentStatus } from '@/core/rpc/rpc-types';
@@ -25,6 +25,7 @@ import RenameDialog from './dialogs/RenameDialog';
 import ChangeDownloadDirDialog from './dialogs/ChangeDownloadDirDialog';
 import SetLabelsDialog from './dialogs/SetLabelsDialog';
 import SpeedLimitDialog from './dialogs/SpeedLimitDialog';
+import RemoveTorrentDialog from './dialogs/RemoveTorrentDialog';
 import ReplaceTrackerDialog from './dialogs/ReplaceTrackerDialog';
 
 const REFRESH_OPTIONS = [
@@ -75,6 +76,7 @@ export default function DashboardPage() {
   const [speedLimitTarget, setSpeedLimitTarget] = useState<{ ids: number[] } | null>(null);
   const [replaceTrackerTarget, setReplaceTrackerTarget] = useState<{ ids: number[] } | null>(null);
   const [setLabelsTarget, setSetLabelsTarget] = useState<{ ids: number[]; labels: string[] } | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<{ ids: number[]; deleteData: boolean } | null>(null);
 
   // Pagination state
   const [pageSize, setPageSize] = useState(30);
@@ -87,7 +89,6 @@ export default function DashboardPage() {
   });
   const { data: sessionStats } = useSessionStats();
   const { data: sessionConfig } = useSessionConfig();
-  const removeTorrent = useRemoveTorrent();
   const startTorrentAction = useStartTorrent();
   const stopTorrentAction = useStopTorrent();
 
@@ -178,10 +179,9 @@ export default function DashboardPage() {
 
   const handleDelete = useCallback(() => {
     if (selectedIds.length > 0) {
-      if (!confirm(`Delete ${selectedIds.length} torrent(s)?`)) return;
-      removeTorrent.mutate({ ids: selectedIds, deleteData: false });
+      setRemoveTarget({ ids: selectedIds, deleteData: false });
     }
-  }, [selectedIds, removeTorrent]);
+  }, [selectedIds]);
 
   const handleStartAll = useCallback(() => {
     const allIds = Object.keys(collection?.all ?? {}).map(Number);
@@ -455,6 +455,7 @@ export default function DashboardPage() {
       <BatchOperationBar
         selectedIds={selectedIds}
         onReplaceTracker={() => { if (selectedIds.length > 0) setReplaceTrackerTarget({ ids: selectedIds }); }}
+        onRemove={handleDelete}
         onChangeDir={() => { if (selectedIds.length > 0 && firstSelected) setChangeDirTarget({ ids: selectedIds, dir: firstSelected.downloadDir ?? '' }); }}
         onSpeedLimit={() => { if (selectedIds.length > 0) setSpeedLimitTarget({ ids: selectedIds }); }}
       />
@@ -568,6 +569,7 @@ export default function DashboardPage() {
           y={contextMenuPos.y}
           onClose={handleCloseContextMenu}
           onRename={(ids, name) => setRenameTarget({ ids, name })}
+          onRemove={(ids, deleteData) => setRemoveTarget({ ids, deleteData })}
           onChangeDir={(ids, dir) => setChangeDirTarget({ ids, dir })}
           onSetLabels={(ids, labels) => setSetLabelsTarget({ ids, labels })}
           onSpeedLimit={(ids) => setSpeedLimitTarget({ ids })}
@@ -596,6 +598,8 @@ export default function DashboardPage() {
         onClose={() => setReplaceTrackerTarget(null)} />
       <SetLabelsDialog open={!!setLabelsTarget} ids={setLabelsTarget?.ids ?? []}
         currentLabels={setLabelsTarget?.labels ?? []} onClose={() => setSetLabelsTarget(null)} />
+      <RemoveTorrentDialog open={!!removeTarget} ids={removeTarget?.ids ?? []}
+        initialDeleteData={removeTarget?.deleteData ?? false} onClose={() => setRemoveTarget(null)} />
     </div>
   );
 }

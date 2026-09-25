@@ -14,6 +14,7 @@ interface Props {
   y: number;
   onClose: () => void;
   onRename?: (ids: number[], name: string) => void;
+  onRemove?: (ids: number[], deleteData: boolean) => void;
   onChangeDir?: (ids: number[], dir: string) => void;
   onSetLabels?: (ids: number[], labels: string[]) => void;
   onSpeedLimit?: (ids: number[]) => void;
@@ -30,7 +31,7 @@ async function copyToClipboard(text: string, label: string) {
 
 export default function TorrentContextMenu({
   torrent, selectedIds, visible, x, y, onClose,
-  onRename, onChangeDir, onSetLabels, onSpeedLimit,
+  onRename, onRemove, onChangeDir, onSetLabels, onSpeedLimit,
 }: Props) {
   const { t } = useTranslation();
   const removeTorrent = useRemoveTorrent();
@@ -65,11 +66,15 @@ export default function TorrentContextMenu({
     },
     {
       key: 'remove', label: t('context.remove'), danger: true,
-      onClick: () => removeTorrent.mutate({ ids, deleteData: false }),
+      onClick: () => (onRemove
+        ? onRemove(ids, false)
+        : removeTorrent.mutate({ ids, deleteData: false })),
     },
     {
       key: 'removeData', label: t('context.removeData'), danger: true,
-      onClick: () => removeTorrent.mutate({ ids, deleteData: true }),
+      onClick: () => (onRemove
+        ? onRemove(ids, true)
+        : removeTorrent.mutate({ ids, deleteData: true })),
     },
     {
       key: 'recheck', label: t('context.recheck'),

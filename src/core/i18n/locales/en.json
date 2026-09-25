@@ -133,5 +133,15 @@
     "free": "Free",
     "version": "Transmission",
     "webControl": "Web Control"
+  },
+  "dialog": {
+    "remove": {
+      "title": "Remove confirm",
+      "confirm-text": "Are you sure you want to remove the checked torrent?",
+      "confirm-text-multi": "Are you sure you want to remove {{count}} checked torrents?",
+      "remove-data": "Delete local data",
+      "remove-error": "Delete failed!",
+      "ok": "Remove", "cancel": "Cancel"
+    }
   }
 }

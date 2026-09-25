@@ -6,17 +6,24 @@ import { exec as rpcExec } from '@/core/rpc/transmission-client';
 interface Props {
   selectedIds: number[];
   onReplaceTracker?: () => void;
+  onRemove?: () => void;
   onChangeDir?: () => void;
   onSpeedLimit?: () => void;
 }
 
-export default function BatchOperationBar({ selectedIds, onReplaceTracker, onChangeDir, onSpeedLimit }: Props) {
+export default function BatchOperationBar({ selectedIds, onReplaceTracker, onRemove, onChangeDir, onSpeedLimit }: Props) {
   const removeTorrent = useRemoveTorrent();
 
   if (selectedIds.length === 0) return null;
 
   const startAll = () => rpcExec({ method: 'torrent-start', arguments: { ids: selectedIds } });
   const stopAll = () => rpcExec({ method: 'torrent-stop', arguments: { ids: selectedIds } });
+  const removeAll = () => {
+    if (onRemove) { onRemove(); return; }
+    if (confirm(`Remove ${selectedIds.length} torrent(s)?`)) {
+      removeTorrent.mutate({ ids: selectedIds, deleteData: false });
+    }
+  };
 
   return (
     <div style={{
@@ -32,7 +39,7 @@ export default function BatchOperationBar({ selectedIds, onReplaceTracker, onCha
         <Button size="small" icon={<LegacyIcon name="change-dir" size={14} />} onClick={onChangeDir}>Change Dir</Button>
         <Button size="small" icon={<LegacyIcon name="speed-limit" size={14} />} onClick={onSpeedLimit}>Speed Limit</Button>
         <Button size="small" danger icon={<LegacyIcon name="remove" size={14} />}
-          onClick={() => removeTorrent.mutate({ ids: selectedIds, deleteData: false })}>Remove</Button>
+          onClick={removeAll}>Remove</Button>
       </Space>
     </div>
   );
