@@ -68,7 +68,7 @@ export default function InfoTab({ torrent, onChangeDownloadDir }: Props) {
         </span>
       ),
     },
-    { key: 'status', label: t('info.status'), children: t(TABLE_STATUS_KEYS[torrent.status] ?? '') ?? torrent.status },
+    { key: 'status', label: t('info.status'), children: t('table.' + (TABLE_STATUS_KEYS[torrent.status] ?? '')) ?? torrent.status },
     {
       key: 'hashString', label: t('info.hash'),
       children: <Text copyable style={{ fontSize: 11 }}>{torrent.hashString}</Text>,

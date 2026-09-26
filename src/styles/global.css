@@ -74,9 +74,9 @@ html, body, #root {
   --eui-sep: #808080;
   /* 工具栏按钮 */
   --eui-btn-text: #444;
-  --eui-btn-hover-bg: #e6e6e6;
-  --eui-btn-hover-border: #ddd;
-  --eui-btn-hover-text: #00438a;
+  --eui-btn-hover-bg: #eaf2ff;
+  --eui-btn-hover-border: #b7d2ff;
+  --eui-btn-hover-text: #000000;
   /* 页面/侧边栏/面板/内容 */
   --eui-body-bg: #fff;
   --eui-body-text: #000;
@@ -135,7 +135,7 @@ body[data-theme='gray'] {
   --eui-btn-text: #000;
   --eui-btn-hover-bg: #e2e2e2;
   --eui-btn-hover-border: #ccc;
-  --eui-btn-hover-text: #0092dc;
+  --eui-btn-hover-text: #000000;
   --eui-body-bg: #f8f8f8;
   --eui-body-text: #000;
   --eui-sidebar-bg: #f8f8f8;
@@ -177,9 +177,9 @@ body[data-theme='metro'] {
   --eui-toolbar-border-top: #eee;
   --eui-sep: #808080;
   --eui-btn-text: #404040;
-  --eui-btn-hover-bg: #e5f0c9;
-  --eui-btn-hover-border: #c8d47b;
-  --eui-btn-hover-text: #859416;
+  --eui-btn-hover-bg: #e0f892;
+  --eui-btn-hover-border: #e0f892;
+  --eui-btn-hover-text: #404040;
   --eui-body-bg: #fff;
   --eui-body-text: #404040;
   --eui-sidebar-bg: #fafafa;
@@ -265,9 +265,9 @@ body[data-theme='black'] {
   --eui-toolbar-border-top: #222;
   --eui-sep: #606060;
   --eui-btn-text: #e6e6e6;
-  --eui-btn-hover-bg: #454545;
-  --eui-btn-hover-border: #666;
-  --eui-btn-hover-text: #fff;
+  --eui-btn-hover-bg: #777777;
+  --eui-btn-hover-border: #555555;
+  --eui-btn-hover-text: #ffffff;
   --eui-body-bg: #000;
   --eui-body-text: #fff;
   --eui-sidebar-bg: #141414;
@@ -457,6 +457,25 @@ body[data-theme='black'] {
 }
 
 /* Tree scroll region (sidebar is now a flex column) */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--eui-item-text);
+  background: var(--eui-toolbar-bg);
+  border-bottom: 1px solid var(--eui-border);
+  flex: none;
+}
+.sidebar-header-collapse {
+  cursor: pointer;
+  padding: 0 4px;
+  color: var(--eui-item-text);
+}
+.sidebar-header-collapse:hover { color: var(--eui-accent); }
 .sidebar-tree-wrap {
   flex: 1;
   min-height: 0;

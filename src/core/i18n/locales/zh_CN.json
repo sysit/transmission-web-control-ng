@@ -30,7 +30,8 @@
     "clearSelected": "取消",
     "collapsePanel": "收起",
     "copyPaths": "Copy Paths",
-    "labels": "用户标签"
+    "labels": "用户标签",
+    "navigation": "导航"
   },
   "table": {
     "name": "名称",
@@ -239,7 +240,8 @@
     "piece": "数据块",
     "complete": "完成",
     "piecesAvailable": "个数据块可用",
-    "selectPrompt": "选择一个种子查看详情"
+    "selectPrompt": "选择一个种子查看详情",
+    "attribute": "属性"
   },
   "status": {
     "torrents": "种子数",
@@ -248,7 +250,9 @@
     "free": "剩余",
     "version": "Transmission",
     "webControl": "Web Control",
-    "up": "已运行"
+    "up": "已运行",
+    "dlSpeed": "下载速度",
+    "ulSpeed": "做种速度"
   },
   "dialog": {
     "remove": {
@@ -309,7 +313,10 @@
     "theme": "主题：",
     "about": "关于",
     "autoReloadOn": "自动刷新已启用",
-    "autoReloadOff": "自动刷新已禁用"
+    "autoReloadOff": "自动刷新已禁用",
+    "autoReload": "自动刷新",
+    "perReload": "秒/次",
+    "enabled": "启用"
   },
   "rename": {
     "title": "改名",

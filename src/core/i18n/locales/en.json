@@ -30,7 +30,8 @@
     "clearSelected": "Clear",
     "collapsePanel": "Collapse",
     "copyPaths": "Copy Paths",
-    "labels": "Labels"
+    "labels": "Labels",
+    "navigation": "Navigation"
   },
   "table": {
     "name": "Name",
@@ -239,7 +240,8 @@
     "piece": "Piece",
     "complete": "Complete",
     "piecesAvailable": "pieces available",
-    "selectPrompt": "Select a torrent to view details"
+    "selectPrompt": "Select a torrent to view details",
+    "attribute": "Attribute"
   },
   "status": {
     "torrents": "Torrents",
@@ -248,7 +250,9 @@
     "free": "Free",
     "version": "Transmission",
     "webControl": "Web Control",
-    "up": "Up"
+    "up": "Up",
+    "dlSpeed": "Download speed",
+    "ulSpeed": "Seed speed"
   },
   "dialog": {
     "remove": {
@@ -309,7 +313,10 @@
     "theme": "Theme:",
     "about": "About",
     "autoReloadOn": "Auto-refresh enabled",
-    "autoReloadOff": "Auto-refresh disabled"
+    "autoReloadOff": "Auto-refresh disabled",
+    "autoReload": "Auto Reload",
+    "perReload": "s/time",
+    "enabled": "Enabled"
   },
   "rename": {
     "title": "Rename",

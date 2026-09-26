@@ -26,6 +26,18 @@ interface Props {
   onSortChange?: (s: SortState | null) => void;
 }
 
+/** Old UI colors the row icon by state: blue ↓ downloading, green ↑ seeding,
+ *  gray ■ paused, orange checking. */
+const STATUS_ICON_COLORS: Record<number, string> = {
+  [TorrentStatus.DOWNLOAD]: '#1E90D6',
+  [TorrentStatus.DOWNLOAD_WAIT]: '#1E90D6',
+  [TorrentStatus.SEED]: '#4CAF50',
+  [TorrentStatus.SEED_WAIT]: '#4CAF50',
+  [TorrentStatus.STOPPED]: '#9E9E9E',
+  [TorrentStatus.CHECK]: '#FF9800',
+  [TorrentStatus.CHECK_WAIT]: '#FF9800',
+};
+
 // i18n keys for status labels (translated at render time)
 const STATUS_MAP: Record<number, [string, string]> = {
   [TorrentStatus.STOPPED]: ['statusStopped', '#999'],
@@ -237,7 +249,7 @@ export default function TorrentTable({
             <span className="torrent-name-link"
               onContextMenu={(e) => { e.preventDefault(); onContextMenu(record, e); }}>
               <LegacyIcon name={statusIconName(record.status)} size={14}
-                style={{ marginRight: 4 }} />
+                style={{ marginRight: 4, color: STATUS_ICON_COLORS[record.status] ?? undefined }} />
               {name}
             </span>
           ),
@@ -295,7 +307,7 @@ export default function TorrentTable({
             if (!s) return null;
             // Old UI renders status as plain text; error→red, warning→#cc9900
             const color = r.error ? 'red' : r.warning ? '#cc9900' : undefined;
-            return <span style={color ? { color } : undefined}>{t(s[0])}</span>;
+            return <span style={color ? { color } : undefined}>{t('table.' + s[0])}</span>;
           },
         },
         {

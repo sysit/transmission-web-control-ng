@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Button, Select, Space, Tooltip, Dropdown, Input, Pagination, App } from 'antd';
+import { Button, Checkbox, Select, Space, Tooltip, Dropdown, Input, Pagination, App } from 'antd';
 import type { MenuProps } from 'antd';
 import { useTranslation } from 'react-i18next';
 import LegacyIcon from '@/components/LegacyIcon';
@@ -394,12 +394,10 @@ export default function DashboardPage() {
                 { value: 'black', label: 'Black' },
               ]}
             />
-            <Tooltip title={t('toolbar.about')}>
-              <Button size="small" type="text" style={{ fontSize: 12 }}
-                onClick={() => setAboutOpen(true)}>
-                <LegacyIcon name="about" size={16} />
-              </Button>
-            </Tooltip>
+            <Button size="small" type="text" style={{ fontSize: 12 }}
+              onClick={() => setAboutOpen(true)}>
+              <LegacyIcon name="about" size={14} /> {t('toolbar.about')}
+            </Button>
           </Space>
         </div>
 
@@ -407,7 +405,7 @@ export default function DashboardPage() {
         <div className="dashboard-toolbar">
           <Tooltip title={t('toolbar.addTorrent')}>
             <Button size="small" icon={<LegacyIcon name="add-torrent" size={16} />} type="text"
-              onClick={() => setAddTorrentOpen(true)} />
+              onClick={() => setAddTorrentOpen(true)}>{t('toolbar.addTorrent')}</Button>
           </Tooltip>
           <div className="toolbar-divider" />
           <Tooltip title={altSpeedEnabled ? t('toolbar.altSpeedOn') : t('toolbar.altSpeedOff')}>
@@ -478,33 +476,29 @@ export default function DashboardPage() {
 
           <Tooltip title={t('toolbar.startAll')}>
             <Button size="small" icon={<LegacyIcon name="start-all" size={16} />} type="text"
-              onClick={handleStartAll}>All</Button>
+              onClick={handleStartAll} />
           </Tooltip>
           <Tooltip title={t('toolbar.pauseAll')}>
             <Button size="small" icon={<LegacyIcon name="pause-all" size={16} />} type="text"
-              onClick={handlePauseAll}>All</Button>
+              onClick={handlePauseAll} />
           </Tooltip>
 
           <div style={{ flex: 1 }} />
 
-          <Select size="small" value={refreshInterval} style={{ width: 65 }}
+          <span style={{ fontSize: 12, color: 'var(--eui-item-text)' }}>{t('toolbar.autoReload')}:</span>
+          <Select size="small" value={refreshInterval} style={{ width: 60 }}
             onChange={(v) => {
               setRefreshInterval(v);
               useConfigStore.setState({ autoReloadInterval: v });
             }}
             options={REFRESH_OPTIONS}
           />
-          <Tooltip title={autoRefresh ? t('toolbar.autoReloadOn') : t('toolbar.autoReloadOff')}>
-            <Button size="small" type="text"
-              icon={<LegacyIcon name="refresh" size={16} />}
-              style={{ color: autoRefresh ? '#0E2D5F' : '#999' }}
-              onClick={() => {
-                const next = !autoRefresh;
-                setAutoRefresh(next);
-                useConfigStore.setState({ autoReload: next });
-              }}
-            />
-          </Tooltip>
+          <span style={{ fontSize: 12, color: 'var(--eui-item-text)' }}>{t('toolbar.perReload')}</span>
+          <Checkbox checked={autoRefresh} onChange={(e) => {
+            const next = e.target.checked;
+            setAutoRefresh(next);
+            useConfigStore.setState({ autoReload: next });
+          }}>{t('toolbar.enabled')}</Checkbox>
           <div className="toolbar-divider" />
 
           <Input size="small" placeholder={t('toolbar.searchPlaceholder')} prefix={<LegacyIcon name="search" size={14} />}
@@ -527,6 +521,11 @@ export default function DashboardPage() {
       <div className="dashboard-body">
         <div className={`dashboard-sidebar${sidebarCollapsed ? ' dashboard-sidebar--collapsed' : ''}`}>
           <div className="sidebar-tree-wrap">
+            <div className="sidebar-header">
+              <span>{t('sidebar.navigation')}</span>
+              <span className="sidebar-header-collapse" title={sidebarCollapsed ? 'Expand' : 'Collapse'}
+                onClick={() => setSidebarCollapsed((prev) => !prev)}>«</span>
+            </div>
             <SidebarTree
               collection={collection ?? null}
               trackers={torrentData?.trackers ?? {}}
@@ -591,8 +590,11 @@ export default function DashboardPage() {
             <>
               <div className="detail-toggle-bar" onClick={handleTogglePanel}>
                 <span className="detail-toggle-text">
-                  Torrent #{selectedTorrentId}
-                  {selectedTorrent && <span> — {selectedTorrent.name}</span>}
+                  {panelExpanded ? t('detail.attribute')
+                    : (<>
+                        Torrent #{selectedTorrentId}
+                        {selectedTorrent && <span> — {selectedTorrent.name}</span>}
+                      </>)}
                 </span>
                 <span className="detail-toggle-icon">
                   {panelExpanded ? <LegacyIcon name="arrow-down" size={10} /> : <LegacyIcon name="arrow-up" size={10} />}
@@ -607,13 +609,7 @@ export default function DashboardPage() {
                 />
               )}
             </>
-          ) : (
-            <div className="detail-toggle-bar detail-toggle-bar--empty">
-              <span className="detail-toggle-text">
-                {t('detail.selectPrompt')}
-              </span>
-            </div>
-          )}
+          ) : null}
         </div>
       </div>
 
