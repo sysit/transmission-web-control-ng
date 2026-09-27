@@ -1,11 +1,11 @@
 {
   "name": "transmission-web-control-ng",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && VITE_BUILD_DATE=$(date +%Y%m%d) vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },
