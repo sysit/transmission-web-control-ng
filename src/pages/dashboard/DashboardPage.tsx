@@ -16,7 +16,6 @@ import type { SortState } from './TorrentTable';
 import StatusBar from './StatusBar';
 import TorrentDetailPanel from './TorrentDetailPanel';
 import TorrentContextMenu from '@/components/TorrentContextMenu';
-import BatchOperationBar from '@/components/BatchOperationBar';
 import SettingsDialog from './SettingsDialog';
 import { useAppTheme } from '@/app/ThemeContext';
 import { useConfigStore } from '@/core/config/config-store';
@@ -508,14 +507,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ════ Batch Operation Bar ════ */}
-      <BatchOperationBar
-        selectedIds={selectedIds}
-        onReplaceTracker={() => { if (selectedIds.length > 0) setReplaceTrackerTarget({ ids: selectedIds }); }}
-        onRemove={handleDelete}
-        onChangeDir={() => { if (selectedIds.length > 0 && firstSelected) setChangeDirTarget({ ids: selectedIds, dir: firstSelected.downloadDir ?? '' }); }}
-        onSpeedLimit={() => { if (selectedIds.length > 0) openSpeedLimit(selectedIds); }}
-      />
 
       {/* ════ Body: Sidebar + Content ════ */}
       <div className="dashboard-body">

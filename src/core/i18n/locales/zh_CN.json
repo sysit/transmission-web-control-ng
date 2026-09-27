@@ -85,15 +85,6 @@
     "copied": "已复制到剪切板",
     "copyFailed": "复制失败"
   },
-  "batch": {
-    "selected": "已选择 {{count}} 个",
-    "startAll": "全部开始",
-    "stopAll": "全部暂停",
-    "replaceTracker": "替换Tracker",
-    "changeDir": "修改目录",
-    "speedLimit": "限速",
-    "remove": "删除"
-  },
   "settings": {
     "title": "服务器参数设置",
     "tabs": {

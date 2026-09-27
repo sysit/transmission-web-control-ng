@@ -85,15 +85,6 @@
     "copied": "copied",
     "copyFailed": "Failed to copy {{label}}"
   },
-  "batch": {
-    "selected": "{{count}} selected",
-    "startAll": "Start All",
-    "stopAll": "Pause All",
-    "replaceTracker": "Replace Tracker",
-    "changeDir": "Change Dir",
-    "speedLimit": "Speed Limit",
-    "remove": "Remove"
-  },
   "settings": {
     "title": "Transmission Preferences",
     "tabs": {
